@@ -1,0 +1,185 @@
+% IMPORTANTE!! la primera línea a continuación se ajusta para la ubicación donde va a encontrarse este paquete. Si es la misma carpeta donde está ubicado el archivo .tex, con sólo poner el nombre del paquete (i.e. mylatex) alcanza. Si está fuera de esa carpeta, hay que poner la ruta completa tanto en ésta línea como en \usepackage{...} en el archivo .tex.
+\ProvidesPackage{mylatex}
+\usepackage[spanish]{babel}     			% varias definiciones para el español
+\usepackage{graphicx}           			% inserción de graficos
+\usepackage{mathtools}          			% fórmulas matemáticas
+\usepackage{hyperref}						% hipervínculos
+\usepackage{listings}						% para formatear el código fuente
+\usepackage[usenames,table]{xcolor}	% color
+\usepackage{setspace}
+\usepackage[spanish]{algorithm2e}
+\usepackage{float}
+\usepackage{enumerate}
+\usepackage{parskip}
+\usepackage{siunitx}						% para unidades en el sistema internacional (e.g. °C)
+\usepackage{tabto}							% para insertar tabulaciones en texto
+\usepackage{multirow}						% para celdas múltiples
+\usepackage{booktabs}						% para líneas entre celda
+\usepackage{textcomp}						% para caracteres como paréntesis angulares (<>)
+\usepackage[T1]{fontenc}					% para algunos caracteres especiales como el pipe '|'
+\usepackage{fancyhdr}						% para formatear el encabezado y pie de página
+\usepackage{geometry}						% dimensiones de la página
+\usepackage{datetime}						% para ajustes de fecha
+\usepackage{titlesec}						% para formatear secciones, subsecciones, etc.
+\usepackage{bookmark}						% para uso de etiqutas en el pdf (bookmarks)
+\usepackage{enumitem}						% para modificar la identación de listas numeradas
+\usepackage{chngcntr}						% para usar numeración por sección (por ejemplo para los nombres de figures)
+\usepackage[labelfont=bf]{caption}			% para usar y fijar para todo el documento numeración de figures en negrita
+
+% Para evitar los warnings por overfull y underfull hbox y vbox
+\hfuzz=20pt
+\vfuzz=20pt
+\hbadness=10000
+\vbadness=\maxdimen
+
+
+%% para eliminar un bug raro que hay con titlesec con una versión de marzo de 2016...cuando deje de joder volar estas 7 líneas
+\usepackage{etoolbox}
+\makeatletter
+\patchcmd{\ttlh@hang}{\parindent\z@}{\parindent\z@\leavevmode}{}{}
+\patchcmd{\ttlh@hang}{\noindent}{}{}{}
+\makeatother
+%% borrar hasta acá!
+
+
+
+% defino la profundidad en la numeración
+\setcounter{secnumdepth}{6}
+%1 CHAPTER
+%1.1 SECTION
+%1.1.1 SUBSECTION
+%1.1.1.1 SUBSUBSECTION
+%1.1.1.1.1 PARAGRAPH
+%1.1.1.1.1.1 SUBPARAGRAPH
+
+% defino la cantidad de niveles que voy a tener bookmarks en el pdf
+\bookmarksetup{open,numbered,depth=6,} % otherwise the setting of counter `tocdepth' would be used
+
+% formato de capítulo
+\makeatletter
+\titleformat{\chapter}[frame]
+  {\normalfont}{\filright\enspace {\fontsize{3cm}{3.5cm}\selectfont\thechapter}\enspace}
+  {16pt}{\huge\bfseries\filcenter}
+\titlespacing*{\chapter}{0pt}{-50pt}{30pt}
+\makeatother
+
+% formato de secciones
+\titleformat{\section}
+  {\normalfont\fontsize{14}{16}\bfseries}{\thesection.}{1 em}{}
+
+% formato de subsecciones
+\titleformat{\subsection}
+  {\normalfont\fontsize{12}{14}\bfseries}{\thesubsection.}{1 em}{}
+
+% formato de subsubsecciones
+\titleformat{\subsubsection}
+  {\normalfont\fontsize{11}{13}\bfseries}{\thesubsubsection.}{1 em}{}  
+  
+% formato de párrafos (equivalente a subsubsubsection)
+\titleformat{\paragraph}  
+  {\normalfont\fontsize{10}{12}\bfseries}{\theparagraph.}{1 em}{}
+ 
+% formato de subpárrafos (equivalente a subsubsubsubsection)
+\titleformat{\subparagraph}  
+  {\normalfont\fontsize{9}{11}\bfseries}{\thesubparagraph.}{1 em}{}
+
+% acomodo las dimensiones y márgenes de la página
+\geometry{
+ a4paper,
+ left=15mm,
+ right=10mm,
+ top=20mm,
+ bottom=22mm,
+ headheight=15pt
+}
+
+% separación entre items
+\setlist[1]{itemsep=0 pt}
+\setlist[2]{itemsep=0 pt}
+
+% cambio la tipografía a helvética
+\usepackage[scaled]{helvet}
+\renewcommand\familydefault{\sfdefault} 
+\usepackage[T1]{fontenc}
+\usepackage[colorinlistoftodos]{todonotes}
+
+% quito la sangría
+\setlength{\parindent}{0cm}
+% espaciado entre párrafos
+\setlength{\parskip}{0.25cm}
+
+% numeración de tablas con números arábigos
+\renewcommand{\thetable}{\arabic{table}}
+
+% definición de colores personalizados
+\definecolor{b}{rgb}{0.3,0.3,1}				% color azul definido por mí (no es azul puro...tiene un toque de rojo y verde)
+\definecolor{w}{rgb}{1,1,1}					% color blanco
+\definecolor{k}{rgb}{0,0,0}					% color negro
+\definecolor{r}{rgb}{1,0,0}					% color rojo
+\definecolor{g}{rgb}{0.3,1,0.3}				% color verde definido por mí (no es verde puro...tiene un toque de rojo y azul)
+
+% texto en negritas color blanco/negro y centrado SÓLO PARA TABLAS
+\newcommand*{\bws}[1]{\multicolumn{1}{|c|}{\color{w}\bfseries #1}} 	% para la primer columna (blanco)
+\newcommand*{\bw}[1]{\multicolumn{1}{c|}{\color{w}\bfseries #1}}   	% para la segunda hasta la última columna (blanco)
+\newcommand*{\bks}[1]{\multicolumn{1}{|c|}{\color{k}\bfseries #1}} 	% para la primer columna (blanco)
+\newcommand*{\bk}[1]{\multicolumn{1}{c|}{\color{k}\bfseries #1}}   	% para la segunda hasta la última columna (blanco)
+\newcommand{\colk}{\color{k}}										% cambia el color a negro (definido más arriba)
+\newcommand{\colr}{\color{r}}										% cambia el color a rojo (definido más arriba)
+\newcommand{\colg}{\color{g}}										% cambia el color a azul (definido más arriba)
+\newcommand{\colb}{\color{b}}										% cambia el color a negro (definido más arriba)
+
+% tipos especiales de alineación de columna. permite alinear a la vez que se define el ancho deseado a la columna
+\newcolumntype{L}[1]{>{\raggedright\let\newline\\\arraybackslash\hspace{0pt}}m{#1}}	% izquierda
+\newcolumntype{C}[1]{>{\centering\let\newline\\\arraybackslash\hspace{0pt}}m{#1}}	% centrado
+\newcolumntype{R}[1]{>{\raggedleft\let\newline\\\arraybackslash\hspace{0pt}}m{#1}}	% derecha
+
+% barra invertida '\' (backslash)
+\newcommand{\bs}{\textbackslash}
+
+% posiciones predefinidas para las tabulaciones
+\TabPositions{1cm,2cm,3cm,4cm,5cm,6cm,7cm,8cm,9cm,10cm,11cm,12cm,13cm,14cm,15cm,16cm,17cm,18cm,19cm,20cm}
+%\NumTabs{10}
+
+% defaults para niveles de viñetas
+\renewcommand\labelitemi{$\bullet$}		% 1er. nivel - círculo relleno (bullet)
+\renewcommand\labelitemii{$\circ$}		% 2do. nivel - círculo (circle)
+\renewcommand\labelitemiii{$\diamond$}	% 3er. nivel - diamante (diamond)
+\renewcommand\labelitemiv{$-$}			% 4to. nivel - guión (símbolo menos)
+
+% espaciado por defecto dentro de celdas de una tabla
+\renewcommand{\arraystretch}{1.4}
+
+% para estilo de texto bash
+\lstdefinestyle{Bash}
+{language=bash,
+keywordstyle=\color{blue},
+numbers=left,
+breaklines=true,
+numberstyle=\small\color{Emerald},
+xleftmargin=2em,
+basicstyle=\ttfamily\small,
+alsoletter={:~\$},
+literate={\$}{{\textcolor{red}{\$}}}1 
+         {:}{{\textcolor{red}{:}}}1
+         {~}{{\textcolor{red}{\texttildelow}}}1,
+}
+
+\lstset{emph={%  
+    ls, wc, head, cat%
+    },emphstyle={\color{blue}}%
+}%
+
+% para cambiar a tipo de letra bash o shell
+\newcommand*{\mf}{\fontfamily{cmtt}\selectfont}
+
+% defino nuevos comandos para símbolos que en ocasiones es medio problemático escribirlos
+\newcommand{\lab}{\texorpdfstring{$\pmb{<}$}} %símbolo '<'...lab: Left Angular Bracket
+\newcommand{\rab}{\texorpdfstring{$\pmb{>}$}} %símbolo '>'...lab: Right Angular Bracket
+\newcommand{\dlab}{\texorpdfstring{$\pmb{<<}$}} %símbolo '<<'...dlab: Double Left Angular Bracket
+\newcommand{\drab}{\texorpdfstring{$\pmb{>>}$}} %símbolo '>>'...drab: Double Right Angular Bracket
+
+% se utiliza numeración en figures
+\counterwithin{figure}{chapter}
+
+% se utiliza numeración en tablas
+\counterwithin{table}{chapter}
