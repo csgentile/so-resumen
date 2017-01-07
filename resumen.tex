@@ -54,18 +54,18 @@
 \begin{minipage}{0.4\textwidth}
 \begin{flushleft} \large
 \emph{Autores:}\\
+Carlos \textsc{Gentile}\\
 Mario \textsc{Rosales}\\
 Franco \textsc{Santellán}\\
-Carlos \textsc{Gentile}\\
 \end{flushleft}
 \end{minipage}
 ~
 \begin{minipage}{0.4\textwidth}
 \begin{flushright} \large
 \emph{E-mail:} \\
+csgentile@gmail.com\\ % Supervisor's Name
 mariorosales941@gmail.com\\
 franco\_chimi@hotmail.com\\
-csgentile@gmail.com\\ % Supervisor's Name
 \end{flushright}
 \end{minipage}\\[2 cm]
 
@@ -100,12 +100,12 @@ csgentile@gmail.com\\ % Supervisor's Name
 Un \textbf{Sistema Operativo} es la capa de software que administra los recursos de la computadora para sus usuarios y aplicaciones. La mayoría de los dispositivos actuales poseen un sistema operativo, desde un ordenador personal o un \textit{smartphone} hasta un automóvil de alta gama.
 
 \begin{figure}[tbhp]
-\centerline{\includegraphics[scale=0.70]{img/fig01}}
+\centerline{\includegraphics[scale=0.70]{img/fig0101}}
 \caption{Sistema operativo de propósito general.}
-\label{fig01}
+\label{fig0101}
 \end{figure}
 
-Para sistemas de propósito general, los usuarios interactúan con aplicaciones, las aplicaciones se ejecutan en un entorno provisto por el sistema operativo y el sistema operativo media el acceso al hardware subyacente, como puede verse en la Figura \ref{fig01}.
+Para sistemas de propósito general, los usuarios interactúan con aplicaciones, las aplicaciones se ejecutan en un entorno provisto por el sistema operativo y el sistema operativo media el acceso al hardware subyacente, como puede verse en la Figura \ref{fig0101}.
 
 Para poder correr múltiples aplicaciones, el sistema operativo necesita desempeñar tres papeles:
 \begin{enumerate}
@@ -302,7 +302,7 @@ En primer lugar, dado que pueden presentarse desafíos de seguridad y confiabili
 \item Almacenamiento a muy gran escala.
 \end{itemize}
 
-
+\clearpage
 
 \chapter{La Abstracción del Kernel}
 Un rol central de los sistemas operativos es la \textbf{protección} -- el aislamiento de aplicaciones y usuarios potencialmente dañinos para evitar que corrompan otras aplicaciones o el propio sistema operativo. La protección es esencial para lograr algunos de los objetivos mencionados antes:
@@ -346,9 +346,9 @@ Esto conduce a la convención de nombres actualmente utilizada en casi todos los
 Una vez que un programa se carga en memoria y el sistema operativo inicia el proceso, el procesador trae una instrucción por vez; a continuación la decodifica y ejecuta. Algunas instrucciones calculan los valores, por ejemplo, al multiplicar dos registros y poner el resultado en otro registro. Algunas instrucciones leen o escriben ubicaciones en la memoria. Y otras instrucciones, como las ramas (saltos/\textit{branches}) o las llamadas de procedimiento, cambian el contador de programa y de este modo determinan la siguiente instrucción a ejecutar.
 
 \begin{figure}[tbhp]
-\centerline{\includegraphics[scale=0.70]{img/fig02}}
+\centerline{\includegraphics[scale=0.70]{img/fig0201}}
 \caption{La operación básica de una CPU.}
-\label{fig02}
+\label{fig0201}
 \end{figure}
 
 Ahora, ¿cómo el kernel del sistema operativo evita que un proceso dañe otros procesos o el propio sistema operativo? Después de todo, cuando múltiples programas se cargan en la memoria al mismo tiempo, ¿qué impide que un proceso sobrescriba las estructuras de datos de otro proceso, o incluso sobrescriba la imagen del sistema operativo almacenado en el disco? La mayoría de las instrucciones son perfectamente seguras, tales como la adición de dos registros y almacenar el resultado en un tercer registro. ¿Se puede modificar el procesador de alguna manera para permitir que las instrucciones seguras se ejecuten directamente en el hardware? Para lograr esto, se implementa el denominado \textbf{modo dual de operación}, representado por un único bit en el registro de estado del procesador que indica el modo actual del procesador. En el \textbf{modo de usuario}, el procesador comprueba cada instrucción antes de ejecutarla para verificar que está permitida para ser realizada por ese proceso. En modo de kernel, el sistema operativo se ejecuta con los controles de protección apagados.
@@ -362,12 +362,12 @@ Del mismo modo, partes del sistema operativo pueden ejecutarse en sus propios pr
 Otro motivo para tener separado del kernel al resto del sistema operativo (código de bibliotecas y cualquier aplicación de nivel usuario) es que a menudo es más fácil de depurar el código de nivel de usuario que el código del kernel. Más importante aún, el kernel debe ser de confianza, ya que tiene control total sobre el hardware. Cualquier error en el kernel puede corromper el disco, la memoria de otras aplicaciones, o simplemente bloquear el sistema. Al separar el código que no necesita estar en el kernel, el sistema operativo puede ser más confiable -- un error en el sistema de ventanas es bastante malo, pero sería aún peor si se podría corromper el disco. Esto ilustra el \textbf{principio de mínimo privilegio}: la seguridad y la confiabilidad aumentan si cada parte del sistema tiene exactamente los privilegios que necesita para hacer su trabajo, y nada más.
 
 \begin{figure}[tbhp]
-\centerline{\includegraphics[scale=0.54]{img/fig03}}
+\centerline{\includegraphics[scale=0.54]{img/fig0202}}
 \caption{El funcionamiento de una CPU con los modos kernel y usuario.}
-\label{fig03}
+\label{fig0202}
 \end{figure}
 
-En la Figura \ref{fig03} se muestra el funcionamiento de un procesador de modo dual; el contador de programa y el bit de modo juntos controlan el funcionamiento del procesador. A su vez, el bit de modo es modificado por algunas instrucciones, tal como el contador de programa es modificado por algunas instrucciones. Para permitir al kernel del sistema operativo proteger las aplicaciones y los usuarios unos de otros, pero también dejar que código de usuario se ejecute directamente en el procesador, como mínimo, el hardware debe ser compatible con tres cosas:
+En la Figura \ref{fig0202} se muestra el funcionamiento de un procesador de modo dual; el contador de programa y el bit de modo juntos controlan el funcionamiento del procesador. A su vez, el bit de modo es modificado por algunas instrucciones, tal como el contador de programa es modificado por algunas instrucciones. Para permitir al kernel del sistema operativo proteger las aplicaciones y los usuarios unos de otros, pero también dejar que código de usuario se ejecute directamente en el procesador, como mínimo, el hardware debe ser compatible con tres cosas:
 
 \begin{itemize}
 \item \textbf{Instrucciones privilegiadas}: todas las instrucciones potencialmente inseguras están prohibidas cuando se ejecutan en modo usuario.
@@ -393,13 +393,13 @@ Para ejecutar un proceso de aplicación, tanto en el sistema operativo como la a
 
 Para compartir memoria de forma segura, el sistema operativo debe ser capaz de configurar el hardware para que cada proceso de aplicación pueda leer y escribir sólo su propia memoria, no la memoria del sistema operativo o cualquier otra aplicación. De lo contrario, una aplicación podría modificar el código o los datos del kernel del sistema operativo para obtener el control sobre el sistema.
 
-En la Figura \ref{fig04} se ilustra el principio general para impedir el acceso a un programa de usuario a partes de la memoria física. 
+En la Figura \ref{fig0203} se ilustra el principio general para impedir el acceso a un programa de usuario a partes de la memoria física. 
 Con este enfoque, un procesador tiene dos registros adicionales, llamados \textbf{base y límite}. La base especifica el inicio de la región de memoria del proceso en la memoria física, mientras que el límite da su punto final. Estos registros pueden ser modificados por instrucciones privilegiadas, es decir, por el sistema operativo que se ejecuta en modo kernel. El código de nivel usuario no puede cambiar los valores de estos registros.
 
 \begin{figure}[tbhp]
-\centerline{\includegraphics[scale=0.55]{img/fig04}}
+\centerline{\includegraphics[scale=0.55]{img/fig0203}}
 \caption{Método Base-Límite de protección de memoria usando direcciones físicas.}
-\label{fig04}
+\label{fig0203}
 \end{figure}
 
 Cada vez que el procesador obtiene una instrucción, se comprueba la dirección del contador de programa para ver si está entre los registros base y límite. Si es así, se permite proceder a la instrucción FETCH (obtener/traer); de otro modo, el hardware genera una excepción, se suspende el programa y se transfiere el control de vuelta al kernel del sistema operativo. Del mismo modo, para instrucciones que leen o escriben datos en la memoria, el procesador comprueba cada referencia a la memoria contra los registros base y límite, lo que genera una excepción de procesador si se violan los límites.
