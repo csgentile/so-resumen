@@ -90,7 +90,7 @@ csgentile@gmail.com\\ % Supervisor's Name
 %------------------------------------------------------------------------------------------------------------------------------------------
 %	FIN DE CARÁTULA
 %------------------------------------------------------------------------------------------------------------------------------------------
-
+\tableofcontents
 %------------------------------------------------------------------------------------------------------------------------------------------
 %	COMIENZO DEL DOCUMENTO PRINCIPAL
 %------------------------------------------------------------------------------------------------------------------------------------------
@@ -1240,7 +1240,7 @@ Diversas operaciones de desencadenar una llamada ascendente de activación plani
 Como resultado, la mayoría de las funciones de gestión de hilo - $thread\_create$, $thread\_ yield$, $thread\_ exit$, y $thread\_ join$, así como las funciones de sincronización que se describen en el Capítulo 5 - se implementan como llamadas de procedimiento dentro del proceso. Sin embargo, el sistema de hilos a nivel de usuario siempre sabe exactamente cuántos procesadores virtuales que se le ha asignado y está en completo control de lo que se ejecuta en los procesadores.
 
 \chapter{Sincronización de acceso a los objetos compartidos}
-Los programas multihilo extienden el modelo tradicional, de un solo subproceso de programación de manera que cada hilo proporciona un único flujo secuencial de ejecución de las instrucciones compuestas familiares. Si un programa tiene hilos independientes que operan en subconjuntos completamente separadas de la memoria, podemos razonar sobre cada hilo por separado. En este caso, el razonamiento acerca de los hilos independientes difiere poco del razonamiento acerca de una serie de programas independientes, de un único subproceso.
+Los programas multihilo extienden el modelo tradicional, de un solo subproceso de programación de manera que cada hilo proporciona un único flujo secuencial de ejecución compuesto por instrucciones conocidas. Si un programa tiene hilos independientes que operan en subconjuntos completamente separados de la memoria, podemos razonar sobre cada hilo por separado. En este caso, el razonamiento acerca de los hilos independientes difiere poco del razonamiento acerca de una serie de programas independientes, de un único subproceso.
 
 Sin embargo, la mayoría de los programas multihilo tienen tanto el estado para cada hilo (por ejemplo, registros de pila y un hilo) y el estado compartido (por ejemplo, variables compartidas en la pila). Los hilos de lectura y escritura cooperan con el estado compartido.
 
@@ -1262,7 +1262,7 @@ Jim Gray, el ganador del premio ACM Turing 1998, acuñó el término \textit{Hei
 
 Teniendo en cuenta estos desafíos, el código multihilo puede introducir errores reproducibles sutiles, no deterministas, y no gubernamentales. En este capítulo se describe un enfoque estructurado para la sincronización del estado compartido en programas multihilo. En lugar de la dispersión de acceso a estos recursos compartidos en todo el programa e intentar razonamiento \textit{ad hoc} sobre lo que ocurre cuando se accede a los hilos se intercalan de diversas maneras, un mejor enfoque consiste en: $(1)$ la estructura del programa para facilitar el razonamiento acerca de la concurrencia, y $(2)$ utiliza un conjunto de primitivas de sincronización estándar para controlar el acceso a estos recursos compartidos. Este enfoque da un poco de libertad, pero si usted sigue constantemente las reglas que se describen en este capítulo, a continuación, el razonamiento sobre programas con estado compartido se convierte en mucho más simple.
 
-La primera parte de este capítulo profundiza en los desafíos que enfrentan los programadores de subprocesos múltiples y el por qué es peligroso tratar de razonar acerca de todas las posibles intercalaciones de hilos en el caso general, no estructurada. El resto del capítulo describe la forma de estructurar los objetos compartidos en programas multihilo para que podamos razonar sobre ellos. En primer lugar, la estructura del Estado compartido de un programa multihilo como un conjunto de objetos compartidos que encapsulan el estado compartido, así como definir y limitar cómo se puede acceder al estado. En segundo lugar, para evitar el razonamiento \textit{ad hoc} sobre los posibles intercalamientos de acceso a las variables de estado dentro de un objeto compartido, se describe cómo los objetos compartidos pueden utilizar un pequeño conjunto de primitivas de sincronización - cerraduras y variables de condición - para coordinar el acceso a su estado por diferentes hilos. En tercer lugar, para simplificar el razonamiento sobre el código en objetos compartidos, se describe un conjunto de mejores prácticas para escribir el código que implementa cada objeto compartido. Por último, se profundiza en los detalles de cómo implementar primitivas de sincronización.
+La primera parte de este capítulo profundiza en los desafíos que enfrentan los programadores de subprocesos múltiples y el por qué es peligroso tratar de razonar acerca de todas las posibles intercalaciones de hilos en el caso general, no estructurada. El resto del capítulo describe la forma de estructurar los objetos compartidos en programas multihilo para que podamos razonar sobre ellos. En primer lugar, la estructura del Estado compartido de un programa multihilo como un conjunto de objetos compartidos que encapsulan el estado compartido, así como definir y limitar cómo se puede acceder al estado. En segundo lugar, para evitar el razonamiento \textit{ad hoc} sobre los posibles intercalamientos de acceso a las variables de estado dentro de un objeto compartido, se describe cómo los objetos compartidos pueden utilizar un pequeño conjunto de primitivas de sincronización - cerrojos y variables de condición - para coordinar el acceso a su estado por diferentes hilos. En tercer lugar, para simplificar el razonamiento sobre el código en objetos compartidos, se describe un conjunto de mejores prácticas para escribir el código que implementa cada objeto compartido. Por último, se profundiza en los detalles de cómo implementar primitivas de sincronización.
 
 La programación multihilo tiene la reputación de ser difícil. Estamos de acuerdo en que se necesita atención, pero este capítulo proporciona un conjunto de reglas simples que cualquiera puede seguir para implementar los objetos que se pueden compartir con seguridad por varios subprocesos.
 
@@ -1330,12 +1330,12 @@ Suponiendo que el compilador y el procesador ejecutan instrucciones en el orden 
 
 \section{La estructura de los objetos compartidos}
 \begin{figure}[tbhp]
-\centerline{\includegraphics[scale=0.45]{img/fig18}}
-\caption{En un programa multi-hilo, hilos están separados y operan simultáneamente en objetos compartidos. Los objetos compartidos contienen ambas variables de estado y sincronización compartidos, que se utilizan para controlar el acceso concurrente a estado compartido..}
-\label{fig18}
+\centerline{\includegraphics[scale=0.45]{img/fig0501}}
+\caption{En un programa multi-hilo, hilos están separados y operan simultáneamente en objetos compartidos. Los objetos compartidos contienen ambas variables de estado y sincronización compartidos, que se utilizan para controlar el acceso concurrente a estado compartido.}
+\label{fig0501}
 \end{figure}
 
-Décadas de trabajo han desarrollado un enfoque mucho más simple para escribir programas multihilo que el uso de cargas y almacenamientos atómicos. Este enfoque se extiende de la modularidad de la programación orientada a objetos para programas multihilo. Como ilustra la \textit{fig.} \ref{fig18}, un programa multi-hilo se construye a partir de los objetos compartidos y un conjunto de hilos que operan en ellos.
+Décadas de trabajo han desarrollado un enfoque mucho más simple para escribir programas multihilo que el uso de cargas y almacenamientos atómicos. Este enfoque se extiende de la modularidad de la programación orientada a objetos para programas multihilo. Como ilustra la \textit{fig.} \ref{fig0501}, un programa multi-hilo se construye a partir de los objetos compartidos y un conjunto de hilos que operan en ellos.
 
 Los objetos compartidos son objetos que se pueden acceder de manera segura por varios subprocesos. Todos estos recursos compartidos en un programa - incluyendo variables asignados en el montón (por ejemplo, objetos asignados con malloc o nuevo) y, variables globales estáticos - debe ser encapsulado en uno o más objetos compartidos.
 
@@ -1361,38 +1361,88 @@ El uso de variables de sincronización simplifica la implementación de objetos 
 
 \item \textbf{La capa de instrucción Atómica.} A pesar de que las capas superiores se benefician de un modelo de programación más simple, no es tortugas hasta el final abajo. Internamente, las variables de sincronización deben gestionar los interleavings de acciones diferentes hilos.
 
-En lugar de implementar las variables de sincronización, tales como cerraduras y variables de condición, utilizando cargas atómicas y tiendas como hemos tratado de hacer por el problema demasiada leche, las implementaciones modernas construyen las variables de sincronización utilizando instrucciones de lectura-modificación-escritura atómicas. Estas instrucciones específicos del procesador dejar un hilo tiene acceso de forma temporal y exclusiva atómica a una ubicación de memoria mientras se ejecuta la instrucción. Típicamente, la instrucción atómicamente lee una posición de memoria, hace alguna operación aritmética simple para el valor, y almacena el resultado. El hardware garantiza que las instrucciones de cualquier otro hilo con el acceso a misma posición de memoria se producen ya sea por completo antes de, o en su totalidad después de, la instrucción de lectura-modificación-escritura atómica.
+En lugar de implementar las variables de sincronización, tales como cerrojos y variables de condición, utilizando cargas atómicas y tiendas como hemos tratado de hacer por el problema demasiada leche, las implementaciones modernas construyen las variables de sincronización utilizando instrucciones de lectura-modificación-escritura atómicas. Estas instrucciones específicos del procesador dejar un hilo tiene acceso de forma temporal y exclusiva atómica a una ubicación de memoria mientras se ejecuta la instrucción. Típicamente, la instrucción atómicamente lee una posición de memoria, hace alguna operación aritmética simple para el valor, y almacena el resultado. El hardware garantiza que las instrucciones de cualquier otro hilo con el acceso a misma posición de memoria se producen ya sea por completo antes de, o en su totalidad después de, la instrucción de lectura-modificación-escritura atómica.
 \end{itemize}
 
 \subsection{Alcance y Hoja de Ruta}
 Los programas concurrentes se construyen en la parte superior de los objetos compartidos. El resto de este capítulo se centra en las capas medias de la figura - Cómo crear objetos compartidos utilizando objetos de sincronización y cómo construir objetos de sincronización de las órdenes de lectura-modificación-escritura atómicas. El capítulo 6 discute los problemas que surgen cuando se componen de varios objetos compartidos en un programa más amplio.
 
 \section{Locks (Bloqueos): Exclusión Mutua}
-Un bloqueo es una variable de sincronización que proporciona la exclusión mutua - cuando un hilo mantiene un bloqueo, ningún otro hilo puede mantenerlo (es decir, otros hilos están excluidos). Un programa tiene asociado cada cerradura con algún subconjunto de estado compartido y requiere un hilo para mantener el bloqueo al acceder a ese estado. Entonces, sólo un hilo puede acceder al estado compartido a la vez.
+Un bloqueo es una variable de sincronización que proporciona la exclusión mutua - cuando un hilo mantiene un bloqueo, ningún otro hilo puede mantenerlo (es decir, otros hilos están excluidos). Un programa tiene asociado cada cerrojo con algún subconjunto de estado compartido y requiere un hilo para mantener el bloqueo al acceder a ese estado. Entonces, sólo un hilo puede acceder al estado compartido a la vez.
 
 La exclusión mutua simplifica en gran medida el razonamiento acerca de los programas ya que un subproceso puede realizar un conjunto arbitrario de operaciones, mientras que mantiene un bloqueo, y esas operaciones parecen ser atómicas a otros hilos. En particular, debido a que un bloqueo hace cumplir la exclusión mutua y los hilos deben sostener el bloqueo para acceder a estos recursos compartidos, ningún otro hilo puede observar un estado intermedio. Otros procesos únicamente pueden observar el estado de la izquierda después de la liberación del bloqueo.
 
-\textbf{Bloqueo para agrupar varias operaciones.} Consideremos, por ejemplo, un objeto de cuenta de banco que incluye una lista de transacciones y un balance total. Para añadir una nueva transacción, adquirimos el bloqueo de la cuenta, añadir la nueva transacción a la lista, leer el antiguo equilibrio, modificarlo, escribir el nuevo equilibrio, y liberar el bloqueo. Para consultar el saldo y relación de las transacciones recientes, adquirimos bloqueo de la cuenta, leemos las transacciones recientes de la lista, lee el equilibrio, y liberar el bloqueo. El uso de cerraduras de esta manera garantiza que una actualización o una consulta completa antes de que comience la siguiente. Cada consulta siempre refleja el conjunto completo de transacciones recientes.
+\textbf{Bloqueo para agrupar varias operaciones.} Consideremos, por ejemplo, un objeto de cuenta de banco que incluye una lista de transacciones y un balance total. Para añadir una nueva transacción, adquirimos el bloqueo de la cuenta, añadir la nueva transacción a la lista, leer el antiguo equilibrio, modificarlo, escribir el nuevo equilibrio, y liberar el bloqueo. Para consultar el saldo y relación de las transacciones recientes, adquirimos bloqueo de la cuenta, leemos las transacciones recientes de la lista, lee el equilibrio, y liberar el bloqueo. El uso de cerrojos de esta manera garantiza que una actualización o una consulta completa antes de que comience la siguiente. Cada consulta siempre refleja el conjunto completo de transacciones recientes.
 
-Otro ejemplo de agrupación es cuando la impresión de salida. Sin bloquear, si dos hilos llamados printf al mismo tiempo, los caracteres individuales de los dos mensajes podrían ser intercalados, garbling su significado. En cambio, en los sistemas operativos modernos multi-hilo, printf utiliza una cerradura para asegurar que el grupo de caracteres en cada mensaje es impreso como una unidad.
+Otro ejemplo de agrupación es cuando la impresión de salida. Sin bloquear, si dos hilos llamados printf al mismo tiempo, los caracteres individuales de los dos mensajes podrían ser intercalados, garbling su significado. En cambio, en los sistemas operativos modernos multi-hilo, printf utiliza un cerrojo para asegurar que el grupo de caracteres en cada mensaje es impreso como una unidad.
 
 Es mucho más fácil de razonar acerca de intercalación de grupos atómicos de operaciones en lugar de intercalar las operaciones individuales para dos razones. En primer lugar, hay un menor número (obviamente) interleavings a considerar. Razonar sobre interleavings sobre una base de grano más grueso reduce el número total de casos a considerar. En segundo lugar, y más importante, que podemos hacer cada grupo atómico de las operaciones corresponden a la estructura lógica del programa, lo que nos permite razonar sobre no invariantes interleavings específicos.
 
-En particular, los objetos compartidos por lo general tienen una cerradura que guarda todos estado de un objeto. Cada método público adquiere el bloqueo a la entrada y libera el bloqueo en la salida. Por lo tanto, el razonamiento sobre el código de una clase compartida es similar a razonar sobre el código de una clase tradicional: se asume un conjunto de invariantes cuando se llama a un método público y restablecer esas invariantes ante un público devuelve el método. Si definimos así nuestros invariantes, podemos razonar acerca de cada método de forma independiente.
+En particular, los objetos compartidos por lo general tienen un cerrojo que guarda todos estado de un objeto. Cada método público adquiere el bloqueo a la entrada y libera el bloqueo en la salida. Por lo tanto, el razonamiento sobre el código de una clase compartida es similar a razonar sobre el código de una clase tradicional: se asume un conjunto de invariantes cuando se llama a un método público y restablecer esas invariantes ante un público devuelve el método. Si definimos así nuestros invariantes, podemos razonar acerca de cada método de forma independiente.
 
-\subsection{Cerraduras: API y Propiedades}
-Una cerradura permite la exclusión mutua, proporcionando dos métodos: Lock::adquieren() y Lock::Release(). Estos métodos se definen como sigue:
+\subsection{Cerrojos: API y Propiedades}
+Un cerrojo permite la exclusión mutua, proporcionando dos métodos: Lock::adquieren() y Lock::Release(). Estos métodos se definen como sigue:
 \begin{itemize}
 \item Un bloqueo puede estar en uno de dos estados: ocupado o libre.
 \item Un bloqueo se encuentra inicialmente en el estado libre.
-\item Lock::adquirir espera hasta que el bloqueo es libre y luego atómicamente hace que el bloqueo OCUPADO. Comprobación del estado para ver si está libre y el establecimiento del estado de OCUPADO están juntos una operación atómica. Incluso si varios subprocesos intentan adquirir el bloqueo, a lo sumo un hilo tendrá éxito. Un hilo observa que el bloqueo es gratis y lo establece en OCUPADO; los otros hilos acaba de ver que la cerradura está ocupado y esperan.
+\item Lock::adquirir espera hasta que el bloqueo es libre y luego atómicamente hace que el bloqueo OCUPADO. Comprobación del estado para ver si está libre y el establecimiento del estado de OCUPADO están juntos una operación atómica. Incluso si varios subprocesos intentan adquirir el bloqueo, a lo sumo un hilo tendrá éxito. Un hilo observa que el bloqueo es gratis y lo establece en OCUPADO; los otros hilos acaba de ver que el1 cerrojo está ocupado y esperan.
 \item Lock::Bloquear la liberación hace que el bloqueo GRATIS. Si hay operaciones pendientes adquirir, este cambio de estado hace que uno de ellos para proceder.
 \end{itemize}
 
-Se describe cómo implementar las cerraduras con estas características en la sección 5.7. El uso de bloqueos hace que la solución del problema de la leche demasiado trivial. Ambos hilos corren el siguiente código:
+Se describe cómo implementar los cerrojos con estas características en la sección 5.7. El uso de bloqueos hace que la solución del problema de la leche demasiado trivial. Ambos hilos corren el siguiente código:
 
 
-\chapter{ 7 Scheduling - Planificación}
+\subsection{Semáforos}
+Los \textbf{semáforos} fueron introducidos por Dijkstra en 1965 para proveer de sincronización dentro del sistema operativo. Entre los avances introducidos en el diseño de sistemas operativos se puede mencionar las formas estructuradas de utilización de la concurrencia.
+
+Lo semáforos se definen como sigue:
+\begin{itemize}
+\item Un semáforo tiene un valor entero no negativo ($\geq 0$).
+\item Cuando un semáforo es creado, su valor puede ser inicializado en cualquier valor entero no negativo.
+\item {\mf Semaphore::P()} espera hasta que el valor sea positivo. Luego, decrementa su valor de manera atómica en 1 y retorna.
+\item {\mf Semaphore::V()} incrementa de manera atómica el valor en 1. Si algún hilo se encuentra esperando en {\mf P}, entonces uno es habilitado, de forma que la llamada a {\mf P} puede decrementar exitosamente el valor y retornar.
+\item No se permiten otras operaciones en un semáforo. En particular, ningún hilo puede leer directamente el valor del semáforo.
+\end{itemize}
+
+Las acciones de comprobar el valor y modificarlo se realizan en conjunto como una sola acción atómica indivisible. Se garantiza que, una vez que empieza una operación de semáforo, ningún otro proceso podrá acceder al semáforo sino hasta que la operación se haya completado o bloqueado. Esta atomicidad es absolutamente esencial para resolver problemas de sincronización y evitar condiciones de carrera.
+
+La operación {\mf V} incrementa el valor del semáforo direccionado. Si uno o más procesos estaban inactivos en ese semáforo, sin poder completar una operación {\mf P} anterior, el sistema selecciona uno de ellos (al azar) y permite que complete su operación {\mf P} . Así, después de una
+operación {\mf V} en un semáforo que contenga procesos inactivos, el semáforo seguirá en 0 pero habrá un proceso menos inactivo en él. La operación de incrementar el semáforo y despertar a un proceso también es indivisible. Ningún proceso se bloquea al realizar una operación {\mf V}.
+
+Lo normal es implementar {\mf V} y {\mf P} como llamadas al sistema, en donde el sistema operativo deshabilita brevemente todas las interrupciones, mientras evalúa el semáforo, lo actualiza y pone el proceso a dormir, si es necesario. Como todas estas acciones requieren sólo unas cuantas instrucciones, no hay peligro al deshabilitar las interrupciones. Si se utilizan varias CPUs, cada semáforo debe estar protegido por una variable lock para asegurar que sólo una CPU a la vez pueda examinar el semáforo.
+
+Los sistemas operativos diferencian a menudo entre semáforos contadores y semáforos binarios. El valor de un \textbf{semáforo contador} puede variar en un dominio no restringido, mientras que el valor del \textbf{semáforo binario} sólo puede ser 0 ó 1. En algunos sistemas, los semáforos binarios se conocen como \textbf{cerrojos mútex}, ya que son cerrojos que proporcionan exclusión mutua. Cuando el recurso está disponible, un proceso accede y decrementa el valor del semáforo con la operación P. El valor queda entonces en 0, lo que hace que si otro proceso intenta decrementarlo tenga que esperar. Cuando el proceso que decrementó el semáforo realiza una operación V, algún proceso que estaba esperando comienza a utilizar el recurso.
+
+Los semáforos contadores se pueden utilizar para controlar el acceso a un determinado recurso formado por un número finito de instancias. El semáforo se inicializa con el número de recursos disponibles. Cada proceso que desee usar un recurso ejecuta una operación {\mf P()} en el semáforo (decrementando la cuenta). Cuando un proceso libera un recurso, ejecuta una operación {\mf V()} (incrementando la cuenta). Cuando la cuenta del semáforo llega a 0, todos los recursos estarán en uso. Después, los procesos que deseen usar un recurso se bloquearán hasta que la cuenta sea mayor a que 0.
+
+También podemos usar los semáforos para resolver diversos problemas de sincronización. Por ejemplo, considere dos procesos que se estén ejecutando de forma concurrente: {\mf P1} con una instrucción {\mf S1} y {\mf P2} con una instrucción {\mf S2}. Suponga que necesitamos que {\mf S2} se ejecute sólo después que {\mf S1} se haya completado. Podemos implementar este esquema dejando que {\mf P1} y {\mf P2} compartan un semáforo común {\mf synch}, inicializado con el valor 0, e insertando las instrucciones:
+
+\lstset{
+	language=C++,
+    basicstyle=\ttfamily,
+	keywordstyle=\color{blue}\ttfamily,
+    stringstyle=\color{red}\ttfamily,
+	commentstyle=\color{green}\ttfamily,
+    morecomment=[l][\color{magenta}]{\#}
+}
+
+\begin{lstlisting}
+S1;
+V(synch);
+\end{lstlisting}
+
+en el proceso {\mf P1}, y las instrucciones
+
+\begin{lstlisting}
+S2;
+P(synch);
+\end{lstlisting}
+
+en el proceso {\mf P2}. Dado que {\mf synch} se inicializa con el valor 0, {\mf P2} ejecutará {\mf S2} sólo después de que {\mf P1} haya invocado 
+V(synch), instrucción que sigue a la ejecución de {\mf S1}.
+
+\setcounter{chapter}{6}
+\chapter{Scheduling - Planificación}
 Cuando hay varias cosas por hacer, cómo podemos elegir qué hacer primero? En los últimos capítulos, hemos descrito cómo crear subprocesos, intercalar entre ellos y sincronizar su acceso a los datos compartidos. En momento dado, algunos subprocesos se están ejecutando en el procesador. Otros están esperando su turno para ocupar el procesador. Mientras otros se bloquean esperando que se complete alguna E/S, se señale una variable de condición o se libere un bloqueo. Cuando hay más subprocesos que procesadores, la \textbf{política de programación del procesador} determina qué subprocesos ejecutar primero.
 
 Podríamos pensar que la respuesta a esta pregunta es fácil: simplemente haga el trabajo en el orden en que llega. Después de todo, eso parece ser la única cosa justa a hacer. Hay una razón por la cual, como veremos más adelante en este capítulo, hacer las cosas por orden de llegada es a veces lo peor que puedes hacer en términos de mejorar el tiempo de respuesta percibido por el usuario.
@@ -1417,7 +1467,7 @@ No hay una respuesta correcta; Más bien, cualquier política de planificación 
 \item \textbf{Starvation - Inanición}. La falta de progreso de una tarea, debido a que los recursos fueron asignados a una tarea de mayor prioridad.
 \end{itemize}
 
-\section{7.1 Planificación de un solo Procesador}
+\section{Planificación de un solo Procesador}
 Comenzamos con tres políticas sencillas: \textit{First-In-First-Out, Shortest-Job-First, and Round-Robin} (primero en entrar-primero en salir, primero el mas corto y en ronda), como una forma de ilustrar los conceptos de programación. Cada enfoque tiene sus propias fortalezas y debilidades, y la mayoría de los sistemas de asignación de recursos (ya sea para procesadores, memoria, red o disco) combinan aspectos de los tres. Al final de la discusión, mostraremos cómo los diferentes enfoques se pueden sintetizar en un planificador de procesador más práctico y completo.
 
 Antes de proceder, necesitamos definir algunos términos. Una carga de trabajo (\textit{workload}) es un conjunto de tareas que debe realizar un sistema, junto con el momento en que llega cada tarea y cuánto tarda cada tarea en completarse (cuándo llega y cuánto tarda cada tarea). En otras palabras, la carga de trabajo define la entrada a un algoritmo de planificación. Dada una carga de trabajo, un planificador de procesador decide cuándo se asigna cada tarea al procesador.
@@ -1428,7 +1478,7 @@ Algunas de las políticas que describimos son la mejor política posible sobre u
 
 Nuestra discusión asume también que el planificador tiene la capacidad de \textit{preempt} (pausar) al procesador y de darlo a alguna otra tarea. La Preemption puede ocurrir debido a una interrupción del temporizador, o porque alguna tarea llega a la \textit{Ready List} con una prioridad más alta que la tarea actual, al menos de acuerdo con alguna política de programación.
 
-\subsection{7.1.1 Primero en entrar, primero en salir (FIFO)}
+\subsection{Primero en entrar, primero en salir (FIFO)}
 Tal vez el algoritmo de programación más simple \textbf{FIFO}: hacer cada tarea en el orden en que llega. FIFO a veces también se llama primero llegado primero servido, o \textbf{FCFS}. Cuando empezamos a trabajar en una tarea, seguimos funcionando hasta que termina. FIFO minimiza la sobrecarga, cambiando entre las tareas sólo cuando cada una esta completa. Debido a que minimiza la sobrecarga, si tenemos un número fijo de tareas, y esas tareas sólo necesitan el procesador, FIFO tendrá el mejor rendimiento: se completará la mayoría de las tareas más rápidamente. Y como mencionamos, FIFO parece ser la definición de la justicia - cada tarea espera pacientemente su turno.
 
 Desafortunadamente, FIFO tiene una debilidad. Si una tarea corta con muy poco trabajo llega despues de comenzada una tarea que toma un tiempo muy largo, entonces el sistema parecerá muy ineficiente. La Figura \ref{fig0701} ilustra una carga de trabajo particularmente mala para FIFO. Si la primera tarea de la cola toma un segundo, y los cuatro siguientes llegan un instante después, pero cada uno sólo necesita un milisegundo del procesador, entonces todos tendrán que esperar hasta que termine el primero. El tiempo de respuesta promedio será más de un segundo, pero el tiempo de respuesta promedio óptimo es mucho menor que eso. De hecho, si ignoramos la conmutación de gastos generales, hay algunas cargas de trabajo donde FIFO es literalmente la peor política posible para el tiempo de respuesta promedio.
@@ -1441,7 +1491,7 @@ Con el fin de mejorar el rendimiento, Facebook y otros sistemas ponen un caché 
 
 Debido a que casi todas las solicitudes son para pequeñas cantidades de datos, memcached responde a peticiones en orden FIFO. Esto minimiza la sobrecarga, ya que no hay necesidad de intervalo de tiempo entre las solicitudes. Para esta carga de trabajo donde las tareas son aproximadamente iguales en tamaño, FIFO es simple, minimiza el tiempo de respuesta promedio e incluso maximiza el rendimiento. \textit{Win-Win!}
 
-\subsection{7.1.2 El trabajo más corto primero (SJF)}
+\subsection{El trabajo más corto primero (SJF)}
 Si FIFO puede ser una mala elección para el tiempo de respuesta promedio, ¿Existe una política óptima para minimizar el tiempo de respuesta promedio? La respuesta es sí: planificar el trabajo más corto primero (SJF).
 
 Supongamos que podríamos saber cuánto tiempo necesita cada tarea en el procesador. (En general, no lo sabremos, por lo que no se trata de una política práctica, sino que la utilizamos como un experimento de pensamiento, más adelante veremos cómo aproximar a SJF en la práctica). Si siempre planificamos la tarea que tiene el trabajo mas corto por hacer, se minimiza el tiempo de respuesta promedio. (Por esta razón, algunos llaman a SJF shortest-remaining-time-first o \textbf{SRTF}.)
@@ -1462,7 +1512,7 @@ Peor aún, SJF puede sufrir de hambre y frecuentes cambios de contexto. Si llega
 \label{fig0701}
 \end{figure}
 
-\subsection{7.1.3 Round Robin}
+\subsection{Round Robin}
 Una política que aborda el hambre es programar las tareas de una manera Round Robin. Con Round Robin, las tareas se turnan ejecutándose en el procesador durante un período limitado de tiempo. El planificador asigna el procesador a la primera tarea en la \textit{Ready List}, estableciendo una interrupción del temporizador para un cierto retardo, llamado el tiempo cuántico. Al final del quantum, si la tarea no se ha completado, la tarea se evita y el procesador se da a la siguiente tarea en la \textit{Ready List}. La tarea anticipada se vuelve a poner en la \textit{Ready List} donde puede esperar su siguiente turno. Con Round Robin, no hay posibilidad de que una tarea se muera de hambre. Finalmente llegará al frente de la cola y obtendrá su tiempo cuántico.
 
 
@@ -1486,7 +1536,7 @@ Desafortunadamente, Round Robin tiene algunas debilidades. La Figura \ref{fig070
 
 Dependiendo del quantum de tiempo, Round Robin también puede ser bastante pobre cuando se ejecuta una mezcla de tareas vinculadas a E/S y tareas de compilación. Las tareas de E/S suelen necesitar períodos muy cortos en el procesador para calcular la operación de E/S siguiente para emitir. Cualquier retraso que se programe en el procesador puede conducir a ralentizaciones en todo el sistema. Por ejemplo, en un editor de texto, a menudo toma sólo unos pocos milisegundos para hacer eco de una pulsación de tecla a la pantalla, un retraso mucho más rápido que la percepción humana. Sin embargo, si estamos compartiendo el procesador entre un editor de texto y varias otras tareas usando Round Robin, el editor debe esperar varios cuantos de tiempo para programar cada golpe de tecla - con un tiempo de $100 ms$, esto puede resultar molesto para el usuario.
 
-\subsection{7.1.4 Max-Min Fairness - Equidad máxima-mínima}
+\subsection{Max-Min Fairness - Equidad máxima-mínima}
 En muchos entornos, una asignación justa de recursos es tan importante para el diseño de un programador como la capacidad de respuesta y la baja sobrecarga. En una máquina multiusuario o en un servidor, no queremos permitir que un solo usuario pueda monopolizar los recursos de la máquina, degradando el servicio para otros usuarios. Aunque puede parecer que la justicia tiene poco valor en las máquinas de un solo usuario, las aplicaciones individuales a menudo son escritas por diferentes compañías, cada una con un interés en hacer que el rendimiento de sus aplicaciones parezca bueno incluso si eso tiene un costo degradante para otras aplicaciones.
 
 Otra complicación surge si debemos asignar recursos de manera justa entre usuarios, aplicaciones, procesos o subprocesos. Algunas aplicaciones pueden ejecutarse dentro de un solo proceso, mientras que otras pueden crear muchos procesos, y cada proceso puede implicar múltiples subprocesos. Round Robin entre los hilos puede conducir a la inanición si las aplicaciones con un solo hilo están compitiendo con las aplicaciones con cientos de hilos. Podemos preocuparnos por la asignación justa en cualquiera de estos niveles de granularidad: hilos dentro de un proceso, procesos para un usuario en particular, usuarios que comparten una máquina física. Por ejemplo, podríamos preocuparnos de asegurarnos de que cada hilo dentro de un proceso progrese. Sin embargo, para simplificar, nuestra discusión supondrá que estamos interesados en proporcionar equidad entre los procesos; los mismos principios se aplican si la unidad que recibe los recursos es el usuario, la aplicación o el hilo.
@@ -1507,7 +1557,7 @@ El algoritmo que acabamos de describir fue originalmente definido para la red, y
 
 Incluso esta aproximación, sin embargo, puede ser computacionalmente costosa, ya que requiere que las tareas se mantengan en una cola de prioridad. Para algunos entornos de servidor, puede haber decenas o incluso cientos de miles de decisiones de programación que deben hacerse cada segundo. Para reducir la sobrecarga computacional del planificador, la mayoría de los sistemas operativos comerciales utilizan un algoritmo algo diferente, con el mismo objetivo, que describiremos a continuación.
 
-\subsection{7.1.5 Caso de Estudio: Multi-Level Feedback (Retroalimentación Multinivel)}
+\subsection{Caso de Estudio: Multi-Level Feedback (Retroalimentación Multinivel)}
 La mayoría de los sistemas operativos comerciales, incluyendo Windows, MacOS y Linux, usan un algoritmo de programación llamado cola de comentarios de nivel múltiple (MFQ). MFQ está diseñado para lograr varios objetivos simultáneos:
 \begin{itemize}
 \item \textbf{Sensibilidad}. Ejecutar tareas cortas rápidamente, como en SJF.
@@ -1527,7 +1577,7 @@ Hasta ahora, el algoritmo que hemos descrito no alcanza la libertad de inanició
 
 El ajuste de la prioridad también aborda el comportamiento estratégico. Desde un punto de vista puramente egoísta, una tarea puede intentar mantener su prioridad alta haciendo una petición de E/S corta inmediatamente antes de que expire su tiempo cuántico. Eventualmente, el sistema detectará esto y reducirá su prioridad a su nivel de participación justa.
 
-\subsection{7.1.6 Summary - Resumen}
+\subsection{Resumen}
 \begin{itemize}
 \item FIFO es simple y minimiza la sobrecarga.
 \item Si las tareas son variables en tamaño, el FIFO puede tener un tiempo de respuesta promedio muy bajo.
