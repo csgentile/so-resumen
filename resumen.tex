@@ -1592,7 +1592,174 @@ El ajuste de la prioridad también aborda el comportamiento estratégico. Desde 
 \item Mediante la manipulación de la asignación de tareas a las colas de prioridad, un planificador MFQ puede lograr un equilibrio entre la capacidad de respuesta, la sobrecarga baja y la imparcialidad.
 \end{itemize}
 
-\chapter{11 File Systems - Sistema de Archivos: Introducción y Visión General}
+\chapter{Traducción de Direcciones}
+Un número sorprendente de características avanzadas del sistema se habilitan poniendo el sistema operativo en control de la traducción de direcciones, la conversión de la dirección de memoria que el programa piensa que hace referencia a la ubicación física de esa celda de memoria. Desde el punto de vista del programador, la traducción de direcciones se realiza de forma transparente - el programa se comporta correctamente a pesar de que su memoria se almacena en algún lugar completamente diferente de donde piensa que se almacena.
+
+Probablemente hayamos aprendido en alguna clase de programación que una dirección de memoria es sólo una dirección. Un puntero en una lista vinculada que contiene la dirección de memoria real de lo que está apuntando. Una instrucción de salto contiene la dirección de memoria real de la siguiente instrucción a ejecutar. ¡Esto es una ficción útil! Para el programador es a menudo mejor no pensar en cómo cada referencia de memoria se convierte en los datos o la instrucción que se hace referencia. En la práctica, hay bastante actividad sucediendo por detrás.
+
+La Traducción de Direcciones es un concepto simple, pero resulta increíblemente poderoso. ¿Qué puede hacer un sistema operativo con la traducción de direcciones? Vamos a listar unos ejemplos:
+\begin{itemize}
+\item \textbf{Aislamiento del proceso}. La protección del kernel del sistema operativo y otras aplicaciones contra código malicioso requiere la capacidad de limitar las referencias de memoria por las aplicaciones. Del mismo modo, la traducción de direcciones puede ser utilizada por las aplicaciones para construir entornos seguros de ejecución segura para extensiones de terceros.
+
+\item \textbf{Comunicación de interproceso}. A menudo, los procesos necesitan coordinarse entre sí, y una manera eficiente de hacerlo es tener los procesos compartidos en una región de memoria común.
+
+\item \textbf{Segmentos de código compartidos}. Las instancias del mismo programa pueden compartir las instrucciones del programa, reduciendo su huella de memoria y haciendo que la caché del procesador sea más eficiente. Del mismo modo, diferentes programas pueden compartir bibliotecas comunes.
+\end{itemize}
+
+En este capítulo, nos centraremos en los mecanismos necesarios para implementar la traducción de direcciones, ya que es la base de todos estos servicios. Para la eficiencia en tiempo de ejecución, la mayoría de los sistemas tienen hardware especializado para hacer traducción de direcciones; Este hardware es administrado por el kernel del sistema operativo. Sin embargo, en algunos sistemas, la traducción es proporcionada por un compilador, un vinculador o un intérprete de código de bytes de confianza. En otros sistemas, la aplicación realiza la traducción de puntero como una forma de administrar el estado de sus propias estructuras de datos. En otros sistemas todavía, se utiliza un modelo híbrido donde las direcciones se traducen tanto en software como en hardware. La elección suele ser un compromiso de ingeniería entre rendimiento, flexibilidad y costo. Sin embargo, la funcionalidad proporcionada es a menudo la misma independientemente del mecanismo utilizado para implementar la traducción. En este capítulo, cubriremos una gama de mecanismos de hardware y software.
+
+\section{Concepto de Traducción de Direcciones}
+\begin{figure}[tbhp]
+\centerline{\includegraphics[scale=0.70]{img/fig0801}}
+\caption{El traductor convierte direcciones de memoria (virtuales) generadas por el programa en direcciones de memoria física.}
+\label{fig0801}
+\end{figure}
+
+Considerada como una caja negra, la traducción de direcciones es una función simple, ilustrada en la Figura \ref{fig0801}. El traductor toma cada instrucción y referencia de memoria de datos generada por un proceso, comprueba si la dirección es legal y la convierte en una dirección de memoria física que puede usarse para buscar o almacenar instrucciones o datos. Los datos en sí - lo que se almacena en la memoria - se devuelve tal cual; No se transforma de ninguna manera. La traducción se implementa generalmente en hardware, y el núcleo del sistema operativo configura el hardware para lograr sus objetivos.
+
+La tarea de este capítulo es rellenar los detalles sobre cómo funciona esa caja negra. Si le preguntamos ahora cómo podría implementarlo, sus primeras varias conjeturas probablemente estarían en la marca. Si dijiste que podríamos usar una matriz, un árbol o una tabla hash, tendrías razón: todos estos enfoques han sido tomados por sistemas reales.
+
+Dado que son posibles varias implementaciones diferentes, ¿cómo evaluar las alternativas? Estas son algunas de las metas que podríamos desear de una caja de traducción; El diseño con el que acabamos dependerá de cómo equilibremos entre estos diversos objetivos.
+
+\begin{itemize}
+\item \textbf{Protección de la memoria}. Necesitamos la capacidad de limitar el acceso de un proceso a ciertas regiones de la memoria, por ejemplo, para evitar que acceda a la memoria que no pertenece al proceso. A menudo, sin embargo, puede que quiera limitar el acceso de un programa a su propia memoria, por ejemplo, para evitar que un error de puntero sobrescriba la región de código o provocar una trampa al depurador cuando el programa hace referencia a una ubicación de datos específica.
+
+\item \textbf{Compartir memoria}. Queremos permitir que varios procesos compartan regiones de memoria seleccionadas. Estas regiones compartidas pueden ser grandes (por ejemplo, si compartimos el segmento de código de un programa entre varios procesos que ejecutan el mismo programa) o relativamente pequeñas (por ejemplo, si compartimos una biblioteca común, un archivo o una estructura de datos compartida).
+
+\item \textbf{Ubicación flexible de la memoria}. Queremos permitir al sistema operativo la flexibilidad de colocar un proceso (y cada parte de un proceso) en cualquier parte de la memoria física; Esto nos permitirá empacar la memoria física de manera más eficiente. Como veremos en el próximo capítulo, la flexibilidad en la asignación de datos de proceso a ubicaciones de memoria física también nos permitirá hacer un uso más efectivo de cachés en el chip.
+
+\item \textbf{Direcciones dispersas}. Muchos programas tienen varias regiones de memoria dinámica que pueden cambiar de tamaño en el curso de la ejecución del programa: el montón de objetos de datos, una pila para cada subproceso y archivos mapeados de memoria. Los procesadores modernos tienen espacios de direcciones de 64 bits, lo que permite a cada objeto dinámico espacio suficiente para crecer según sea necesario, pero hacer la traducción más compleja.
+
+\item \textbf{La eficiencia de búsqueda en tiempo de ejecución}. La traducción de direcciones de hardware se produce en cada búsqueda de instrucciones y en cada carga y almacenamiento de datos. Sería impráctico que una búsqueda tuviera, en promedio, mucho más tiempo de ejecución que la instrucción misma. Al principio, muchos de los esquemas que discutimos parecerán descabelladamente imprácticos! Discutiremos maneras de hacer eficientes los sistemas de traducción más complicados.
+
+\item \textbf{Tablas de traducción compacta}. También queremos que la sobrecarga de espacio de la traducción sea mínima; Cualquier estructura de datos que necesitamos debe ser pequeña en comparación con la cantidad de memoria física que se está administrando.
+
+\item \textbf{Portabilidad}. Las diferentes arquitecturas de hardware hacen diferentes opciones en cuanto a cómo implementan la traducción; Si un kernel del sistema operativo debe ser fácilmente portátil a través de múltiples arquitecturas de procesador, necesita ser capaz de mapear desde sus estructuras de datos (independientes del hardware) a las capacidades específicas de cada arquitectura.
+\end{itemize}
+
+Terminaremos con un mecanismo de traducción de direcciones bastante complejo, por lo que nuestra discusión comenzará con los mecanismos más sencillos posibles y agregará funcionalidad solo según sea necesario. Durante la discusión será útil tener en cuenta las dos visiones de la memoria: el proceso ve su propia memoria, usando sus propias direcciones. Llamaremos a estas direcciones virtuales, porque no necesariamente corresponden a ninguna realidad física. Por el contrario, para el sistema de memoria, sólo hay direcciones físicas - ubicaciones reales en la memoria. Desde la perspectiva del sistema de memoria, se
+Direcciones y realiza búsquedas y almacena valores. El mecanismo de traducción convierte entre las dos vistas: de una dirección virtual a una dirección de memoria física.
+
+\section{Hacia una traducción flexible de direcciones}
+Nuestra discusión de la traducción de direcciones de hardware se divide en dos pasos. En primer lugar, ponemos a un lado la cuestión de la eficiencia de búsqueda y consideramos la mejor manera de lograr los otros objetivos enumerados anteriormente: asignación de memoria flexible, eficiencia espacial, protección y compartición de grano fino, etc. Una vez que tengamos las características que queremos, entonces agregamos mecanismos para ganar la eficiencia de búsqueda posterior.
+
+Hemos ilustrado la noción de protección de la memoria del hardware utilizando el hardware más simple imaginable: \textit{base y límite}. La caja de traducción consta de dos registros adicionales por proceso. El registro base especifica el inicio de la región de memoria física del proceso; El registro enlazado especifica el alcance de esa región. Si el registro base se agrega a cada dirección generada por el programa, entonces ya no necesitamos un cargador de reubicación - las direcciones virtuales del programa comienzan desde 0 y van hasta el límite, y las direcciones físicas comienzan desde la base y van hasta la base $+$ límite. Dado que la memoria física puede contener varios procesos, el núcleo restablece el contenido de los registros de base y de límites en cada cambio de contexto de proceso a los valores apropiados para ese proceso.
+
+La traducción de base y límites es simple y rápida, pero carece de muchas de las características necesitadas para apoyar programas modernos. La traducción de base y límites sólo soporta la protección de grano grueso a nivel de todo el proceso; No es posible evitar que un programa sobrescriba su propio código, por ejemplo. También es difícil compartir regiones de memoria entre dos procesos. Puesto que la memoria para un proceso necesita ser contigua, soportar regiones de memoria dinámica, tal como para pilas, pilas de hilos o archivos mapeados en memoria, resulta difícil de imposible.
+
+\subsection{Segmentación de Memoria}
+Muchas de las limitaciones de la traducción de base y límites se pueden remediar con un pequeño cambio: en lugar de mantener sólo un par de registros de base y de límites por proceso, el hardware puede soportar una matriz de pares de registros de base y de límites para cada proceso. Esto se llama segmentación. Cada entrada en la matriz controla una porción o segmento del espacio de direcciones virtual. La memoria física para cada segmento se almacena de forma contigua, pero se pueden almacenar diferentes segmentos en diferentes ubicaciones. Los bits de orden superior de la dirección virtual se utilizan para indexar en la matriz; El resto de la dirección se trata entonces como se ha añadido anteriormente a la base y se comprueba contra el límite almacenado en ese índice. Además, el sistema operativo puede asignar a diferentes segmentos permisos diferentes, por ejemplo, para permitir el acceso de sólo ejecución al código y acceso de lectura y escritura a los datos. En general el número de segmentos se determina por el número de bits para el número de segmento que se reservan en la dirección virtual.
+
+Parece extraño que la memoria segmentada tenga lagunas; La memoria del programa ya no es una sola región contigua, sino que es un conjunto de regiones. Cada segmento diferente comienza en un nuevo límite de segmento. Por ejemplo, el código y los datos no están inmediatamente adyacentes entre sí en el espacio de direcciones virtual o físico.
+
+¿Qué sucede si un programa se ramifica o trata de cargar datos de una de estas brechas? El hardware generará una excepción, atrapada en el kernel del sistema operativo. En los sistemas UNIX, esto todavía se llama un error de segmentación, es decir, una referencia fuera de un segmento legal de la memoria. ¿Cómo un programa evita deambular en una de estas brechas? Los programas correctos no generarán referencias fuera de la memoria válida. Dicho de otra manera, tratar de ejecutar código o leer datos que no existen es probablemente una indicación de que el programa tiene un error en él.
+
+Aunque es fácil de implementar y administrar, la memoria segmentada es notablemente potente y ampliamente utilizada. Por ejemplo, la arquitectura x86 está segmentada (con algunas mejoras que describiremos más adelante). Con los segmentos, el sistema operativo puede permitir que los procesos compartan algunas regiones de la memoria mientras se mantienen protegidas otras regiones. Por ejemplo, dos procesos pueden compartir un segmento de código estableciendo una entrada en sus tablas de segmentos para apuntar a la misma región de memoria física, para usar la misma base y los mismos límites. Los procesos pueden compartir el mismo código mientras se trabaja con datos diferentes, configurando la tabla de segmentos para apuntar a diferentes regiones de la memoria física para el segmento de datos.
+
+Del mismo modo, las rutinas de la biblioteca compartida, como una biblioteca de gráficos, pueden colocarse en un segmento y compartirlo entre procesos. Como antes, los datos de la biblioteca estarían en un segmento separado, no compartido. Esto se hace con frecuencia en sistemas operativos modernos con bibliotecas enlazadas dinámicamente. Un problema práctico es que diferentes procesos pueden cargar diferentes números de bibliotecas, por lo que pueden asignar a la misma biblioteca un número de segmento diferente. Dependiendo de la arquitectura del procesador, el uso compartido puede seguir funcionando si el código de la biblioteca utiliza direcciones segmentos-locales, direcciones que son relativas al segmento actual.
+
+También podemos usar segmentos para la comunicación entre procesos, si los procesos reciben permiso de lectura y escritura para el mismo segmento. Multics, un sistema operativo de la década de 1960 que contenía muchas de las ideas que ahora encontramos en Microsoft Windows 7, Mac OS X de Apple y Linux, hizo un uso extensivo de la memoria segmentada para compartir entre procesos. Los sistemas más modernos tienden a usar segmentos sólo para regiones de memoria de grano más grueso, tales como el código y los datos de toda una biblioteca compartida, en lugar de para cada una de las estructuras de datos dentro de la biblioteca.
+
+Como ejemplo final de la potencia de los segmentos, permiten la gestión eficiente de la memoria asignada dinámicamente. Cuando un sistema operativo reutiliza la memoria o el espacio en disco que se había utilizado anteriormente, primero debe anular el contenido de la memoria o del disco. De lo contrario, los datos privados de una aplicación podrían, inadvertidamente, filtrarse a otra aplicación potencialmente malintencionada. Por ejemplo, puede introducir una contraseña en un sitio web, por ejemplo, para un banco y, a continuación, salir del explorador. Sin embargo, si la memoria física subyacente utilizada por el explorador se vuelve a asignar a un nuevo proceso, la contraseña se podría filtrar a un sitio web malicioso.
+
+El principal inconveniente de la segmentación es la sobrecarga de gestión de un gran número de segmentos de memoria de tamaño variable y de crecimiento dinámico. Con el tiempo, a medida que se crean y terminan los procesos, la memoria física se dividirá en regiones que están en uso y regiones que no están disponibles, es decir, disponibles para asignarse a un nuevo proceso. Estas regiones libres serán de diferentes tamaños. Cuando creemos un nuevo segmento, tendremos que encontrar un lugar libre para él. ¿Deberíamos ponerlo en la región más pequeña abierta donde encajará? ¿La región abierta más grande?
+
+Sin embargo, elegimos colocar nuevos segmentos, a medida que se asigna más memoria, el sistema operativo puede llegar a un punto donde hay suficiente espacio libre para un nuevo segmento, pero el espacio libre no es contiguo. Esto se llama \textbf{fragmentación externa}. El sistema operativo es libre de compactar la memoria para crear espacio sin afectar a las aplicaciones, ya que las direcciones virtuales no cambian cuando reubicamos un segmento en la memoria física. Aún así, la compactación puede ser costosa en términos de sobrecarga del procesador: una configuración típica de servidor tardaría aproximadamente un segundo en compactar su memoria.
+
+Todo esto se vuelve aún más complejo cuando los segmentos de memoria pueden crecer. ¿Cuánta memoria debemos dejar de lado para el heap de un programa? Si ponemos el segmento de heap en una parte de la memoria física con mucho espacio, entonces habremos perdido la memoria si ese programa resulta necesitar sólo un pequeño espacio. Si hacemos lo contrario - poner el segmento de heap en un pequeño trozo de memoria física - entonces tendremos que copiar en otro lugar si cambia de tamaño.
+
+\subsection{Paginación de Memoria}
+Una alternativa a la memoria segmentada es la memoria paginada. Con la paginación, la memoria se asigna en trozos de tamaño fijo llamados marcos de página. La traducción de direcciones es similar a cómo funciona con la segmentación. En lugar de una tabla de segmentos cuyas entradas contienen punteros a segmentos de tamaño variable, hay una tabla de páginas para cada proceso cuyas entradas contienen punteros a marcos de página. Debido a que los cuadros de página son de tamaño fijo y tienen una potencia de dos, las entradas de la tabla de páginas solo necesitan proporcionar los bits superiores de la dirección del marco de página, por lo que son más compactos. No hay necesidad de un "límite" en el offset; Toda la página en la memoria física se asigna como una unidad. 
+
+Lo que parecerá extraño, y tal vez bueno, acerca de la paginación es que mientras un programa piensa en su memoria como lineal, de hecho su memoria puede ser, y normalmente está, esparcida por toda la memoria física en una especie de mosaico abstracto. El procesador ejecutará una instrucción tras otra utilizando direcciones virtuales; Sus direcciones virtuales son todavía lineales. Sin embargo, la instrucción situada al final de una página se ubicará en una región de memoria física completamente diferente de la siguiente instrucción al principio de la página siguiente. Las estructuras de datos parecerán contiguas usando direcciones virtuales, pero una matriz grande puede estar dispersa a través de muchos marcos de páginas físicas.
+
+La paginación aborda la principal limitación de la segmentación: la asignación de espacios libres es muy sencilla. El sistema operativo puede representar la memoria física como un mapa de bits, con cada bit representando un marco de página físico que está libre o en uso. Encontrar un marco libre es sólo una cuestión de encontrar un bit vacío.
+
+También es conveniente compartir la memoria entre procesos: necesitamos configurar la entrada de la tabla de páginas para cada proceso compartiendo una página para que apunte al mismo marco de página física. Para una región compartida grande que abarca varios marcos de página, como una biblioteca compartida, esto puede requerir la configuración de varias entradas de tabla de páginas. Dado que necesitamos saber cuándo liberar la memoria cuando finaliza un proceso, la memoria compartida requiere una contabilidad adicional para realizar un seguimiento de si la página compartida todavía está en uso. La estructura de datos para esto se llama mapa central; Registra información acerca de cada marco de página físico, como las entradas de la tabla de páginas que apuntan a ella.
+
+Muchas de las optimizaciones que hemos discutido en la segmentación también se puede hacer con paginación. Para copy-on-write, necesitamos copiar las entradas de la tabla de páginas y configurarlas como de sólo lectura; En una tienda a una de estas páginas, podemos hacer una copia real del marco de la página subyacente antes de reanudar el proceso. Del mismo modo, para \textit{cero} en referencia, podemos configurar la entrada de la tabla de páginas en la parte superior de la pila para que sea inválida, causando una trampa en el kernel. Esto nos permite extender la pila solamente según sea necesario.
+
+Las tablas de páginas permiten añadir otras características. Por ejemplo, podemos iniciar un programa que se ejecuta antes de que todo su código y datos se carguen en la memoria. Inicialmente, el sistema operativo marca todas las entradas de la tabla de páginas para un nuevo proceso como no válido; Como las páginas se introducen desde el disco, que las marca como páginas de sólo lectura (para páginas de códigos) o de lectura y escritura (para páginas de datos). Sin embargo, una vez que las primeras páginas están en la memoria, el sistema operativo puede iniciar la ejecución del programa en modo de usuario, mientras que el núcleo sigue transfiriendo el resto del código del programa en segundo plano. A medida que el programa se inicia, si sucede saltar a una ubicación que aún no se ha cargado, el hardware provocará una excepción y el núcleo puede bloquear el programa hasta que esa página esté disponible. Además, el compilador puede reorganizar el ejecutable del programa para un inicio más eficiente, uniendo las páginas de inicialización en unas pocas páginas al inicio del programa, superponiendo así la inicialización y cargando el programa desde el disco.
+
+Un inconveniente de la paginación es que mientras que la gestión de la memoria física se vuelve más simple, la gestión del espacio de direcciones virtuales se vuelve más difícil. Los compiladores normalmente esperan que la pila de ejecución sea contigua (en direcciones virtuales) y de tamaño arbitrario; Cada nueva llamada de procedimiento supone que la memoria para la pila está disponible. Del mismo modo, la biblioteca de tiempo de ejecución para asignación de memoria dinámica normalmente espera un montón contiguo. En un proceso de un solo hilo, podemos colocar la pila y el heap en extremos opuestos del espacio de direcciones virtuales, y hacer que crezcan unos hacia otros. Sin embargo, con múltiples subprocesos por proceso, necesitamos múltiples pilas de subprocesos, cada una con espacio para crecer.
+
+Esto se convierte aún más en un problema con espacios de direcciones virtuales de 64 bits. El tamaño de la tabla de páginas es proporcional al tamaño del espacio de direcciones virtuales, no al tamaño de la memoria física. Cuanto más escaso sea el espacio de direcciones virtuales, más gastos generales se necesitan para la tabla de páginas. La mayoría de las entradas no son válidas, representando partes del espacio de direcciones virtuales que no se utilizan, pero todavía se necesita memoria física para todas las entradas de la tabla de páginas.
+
+Podemos reducir el espacio ocupado por la tabla de páginas eligiendo un marco de página más grande. ¿Qué tamaño debe tener un marco de página? Un marco de página más grande puede perder espacio si un proceso no usa toda la memoria dentro del marco. Esto se llama \textbf{fragmentación interna}. Los trozos de tamaño fijo son más fáciles de asignar, pero pierden espacio si no se utiliza todo el trozo. Desafortunadamente, esto significa que con la paginación, cualquiera de las páginas es muy grande (pérdida de espacio debido a la fragmentación interna), o la tabla de páginas es muy grande (pérdida de espacio) o ambas cosas. Por ejemplo, con páginas de 16 KB y un espacio de direcciones virtuales de 64 bits, podríamos necesitar 250 entradas de tabla de páginas.
+
+\subsection{Traducción de varios niveles}
+Si usted fuera a diseñar un sistema eficiente para hacer una búsqueda en un espacio de teclado, probablemente no elegiría una matriz simple. Un árbol o una tabla hash son más apropiados, y de hecho, los sistemas modernos usan ambos. Nos centramos en esta subsección sobre los árboles; Discutiremos tablas hash después.
+
+Muchos sistemas utilizan la traducción de direcciones basada en árboles, aunque los detalles varían de un sistema a otro y la terminología puede ser un poco confusa. A pesar de las diferencias, los sistemas que estamos a punto de describir tienen propiedades similares. Soportan la protección de memoria gruesa y granulada y el uso compartido de la memoria, la colocación flexible de la memoria, la asignación eficiente de la memoria, y la búsqueda eficiente para los espacios de dirección dispersos, incluso para las máquinas 64-bit.
+
+Casi todos los sistemas de traducción de direcciones de varios niveles usan la paginación como el nivel más bajo del árbol. Las principales diferencias entre los sistemas se encuentran en la forma en que alcanzan la tabla de páginas en la hoja del árbol - ya sea utilizando segmentos más paginación, o múltiples niveles de paginación, o segmentos más múltiples niveles de paginación. 
+
+Hay varias razones para esto:
+\begin{itemize}
+\item \textbf{Asignación eficiente de memoria}. Al asignar memoria física en marcos de páginas de tamaño fijo, la gestión del espacio libre puede utilizar un mapa de bits simple.
+
+\item \textbf{Transferencias eficientes de disco}. Los discos de hardware se dividen en regiones de tamaño fijo llamadas sectores; Los sectores de disco deben ser leídos o escritos en su totalidad. Al convertir el tamaño de página en un múltiplo del sector del disco, simplificamos las transferencias desde y hacia la memoria, para cargar programas en la memoria, leer y escribir archivos y usar el disco para simular una memoria mayor que la que está físicamente presente en la máquina.
+
+\item \textbf{Búsqueda eficiente}. Describiremos en la siguiente sección cómo podemos usar un caché llamado buffer de traducción para hacer búsquedas rápidas en el caso común; El búfer de traducción almacena las búsquedas en una página. La paginación también permite que las tablas de búsqueda sean más compactas, especialmente importantes en el nivel más bajo del árbol.
+
+\item \textbf{Búsqueda inversa eficiente}. El uso de marcos de página de tamaño fijo también facilita la implementación del mapa central, para pasar de un marco de página físico al conjunto de direcciones virtuales que comparten el mismo marco. Esto será crucial para implementar la ilusión de una memoria virtual infinita en el próximo capítulo.
+
+\item \textbf{Protección y compartición de granularidad de páginas}. Por lo general, cada entrada de tabla en cada nivel del árbol tendrá sus propios permisos de acceso, permitiendo compartir de grano grueso y de grano fino, hasta el nivel del marco de página individual.
+\end{itemize}
+
+\textbf{Segmentación Paginada}
+
+Comencemos un sistema con sólo dos niveles de un árbol. Con segmentación paginada, la memoria está segmentada, pero en lugar de que cada entrada de tabla de segmentos apunte directamente a una región contigua de memoria física, cada entrada de tabla de segmentos apunta a una tabla de páginas que a su vez apunta a la memoria que respalda ese segmento. La entrada de tabla de segmentos "bound" describe la longitud de la tabla de páginas, es decir, la longitud del segmento en páginas. Debido a que la paginación se utiliza en el nivel más bajo, todas las longitudes de segmento son un múltiplo del tamaño de página.
+
+Aunque las tablas de segmentos a veces se almacenan en registros de hardware especiales, las tablas de página para cada segmento son bastante más grandes en agregado, por lo que normalmente se almacenan en la memoria física. Para mantener el asignador de memoria simple, el tamaño máximo del segmento se elige generalmente para permitir que la tabla de páginas para cada segmento sea un pequeño múltiplo del tamaño de la página.
+
+Por ejemplo, con direcciones virtuales de 32 bits y páginas de 4 KB, podríamos dejar de lado los diez bits superiores para el número de segmento, los diez bits siguientes para el número de página y doce bits para el desplazamiento de página. En este caso, si cada entrada de tabla de página es de cuatro bytes, la tabla de páginas para cada segmento encajaría exactamente en un marco de página física.
+
+\textbf{Paginación Multi-Nivel}
+Un enfoque casi equivalente a la segmentación paginada es utilizar múltiples niveles de tablas de páginas. En el procesador Sun Microsystems SPARC, por ejemplo, hay tres niveles de tabla de páginas. La tabla de páginas de nivel superior contiene entradas, cada una de las cuales apunta a una tabla de página de segundo nivel cuyas entradas son punteros a tablas de páginas. En el SPARC, como ocurre con la mayoría de los otros sistemas que utilizan múltiples niveles de tablas de páginas, cada nivel de la tabla de páginas está diseñado para encajar en un marco de página físico. Sólo se debe rellenar la tabla de páginas de nivel superior; Los niveles inferiores del árbol se asignan sólo si esas porciones del espacio de direcciones virtuales están en uso por un proceso particular. Los permisos de acceso se pueden especificar en cada nivel, por lo que el intercambio entre procesos es posible en cada nivel.
+
+\textbf{Paginación Segmentada Multi-Nivel}
+
+Podemos combinar estos dos enfoques usando una memoria segmentada donde cada segmento es administrado por una tabla de páginas de varios niveles. Este es el enfoque adoptado por el x86, tanto para sus modos de 32 bits como de 64 bits.
+
+Describimos el caso de 32 bits primero. La terminología x86 difiere ligeramente de lo que hemos utilizado aquí. El x86 tiene una tabla de descriptores globales por proceso (GDT), equivalente a una tabla de segmentos. El GDT se almacena en la memoria; Cada entrada (descriptor) apunta a la tabla de páginas (multi-nivel) para ese segmento, junto con los permisos de acceso de segmentos y segmentos de segmento. Para iniciar un proceso, el sistema operativo configura el GDT e inicializa un registro, el Registro de Tabla de Descriptor Global (GDTR), que contiene la dirección y la longitud del GDT.
+
+Debido a su historial, el x86 utiliza registros de procesador separados para especificar el número de segmento (es decir, el índice en el GDT) y la dirección virtual para su uso por cada instrucción. Por ejemplo, en el x86 de "32 bits", hay un número de segmento y 32 bits de dirección virtual dentro de cada segmento. En el x86 de 64 bits, la dirección virtual dentro de cada segmento se extiende a 64 bits. Sin embargo, la mayoría de las aplicaciones sólo utilizan algunos segmentos, por lo que la tabla de segmentos por proceso es generalmente corta. El kernel del sistema operativo tiene su propia tabla de segmentos; Se configura para permitir que el núcleo tenga acceso, con direcciones virtuales, a todos los segmentos por proceso y compartidos del sistema.
+
+Para la eficiencia de codificación, el registro de segmentos es a menudo implícito como parte de la instrucción. Por ejemplo, las instrucciones de pila x86 como push y pop asumen el segmento de pila (el índice almacenado en el registro de segmento de pila), las instrucciones de ramificación asumen el segmento de código (el índice almacenado en el registro de segmento de código), etc. Como optimización, siempre que el x86 inicialice un registro de código, pila o segmento de datos, también lee la entrada GDT (es decir, el puntero de tabla de página de nivel superior y los permisos de acceso) en el procesador, para que el procesador pueda ir directamente al Página en cada referencia.
+
+
+\subsection{Portabilidad}
+La diversidad de los diferentes mecanismos de traducción plantea un reto al diseñador del sistema operativo. Para ser ampliamente utilizado, queremos que nuestro sistema operativo sea fácilmente portátil para una gran variedad de arquitecturas de procesadores diferentes. Incluso dentro de una familia de procesadores dada, como una x86, hay un número de variantes diferentes que un sistema operativo puede necesitar para soportar. La densidad de memoria principal está aumentando tanto el espacio de direcciones físico como virtual casi un poco por año. En otras palabras, para que una tabla de páginas de varios niveles pueda asignar toda la memoria, se necesita un nivel adicional de la tabla de páginas cada década para mantenerse al día con el tamaño creciente de la memoria principal.
+
+Otro desafío es que el sistema operativo a menudo necesita mantener dos conjuntos de libros con respecto a la traducción de direcciones. Un conjunto de libros es la vista de hardware - el procesador consulta un conjunto de tablas de páginas segmentadas y multi-nivel para poder ejecutar correctamente y de forma segura las instrucciones y cargar y almacenar datos. Un conjunto diferente de libros es la vista del sistema operativo del espacio de direcciones virtuales. Para soportar funciones como copia y escritura, referencia cero y referencia de relleno, el sistema operativo debe realizar un seguimiento de información adicional sobre cada página virtual más allá de Lo que se almacena en la tabla de páginas de hardware.
+
+Estas estructuras de datos de gestión de memoria de software reflejan, pero no son idénticas a, las estructuras de hardware, que consta de tres partes:
+\begin{itemize}
+\item \textbf{Lista de objetos de memoria}. Los objetos de memoria son segmentos lógicos. Si el hardware subyacente está o no segmentado, el gestor de memoria del kernel necesita supervisar qué regiones de memoria representan los datos subyacentes, tales como código de programa, código de biblioteca, datos compartidos entre dos o más procesos, una región de copia en escritura, O un archivo mapeado en memoria. Por ejemplo, cuando un proceso se inicia, el kernel puede comprobar la lista de objetos para ver si el código ya está en la memoria; Asimismo, cuando un proceso abre una biblioteca, puede comprobar si ya ha sido vinculado por algún otro proceso. Del mismo modo, el núcleo puede mantener conteos de referencia para determinar qué regiones de memoria recuperar en la salida del proceso.
+
+\item \textbf{Traducción virtual a física}. En una excepción y durante la copia del parámetro de llamada del sistema, el kernel debe poder traducir desde las direcciones virtuales de un proceso a sus ubicaciones físicas. Si bien el núcleo puede utilizar las tablas de páginas de hardware para ello, el núcleo también necesita realizar un seguimiento de si una página no válida es realmente inválida o simplemente no está cargada todavía (en el caso de relleno de referencia) o si es de sólo lectura Página es verdaderamente de sólo lectura o simplemente simular un punto de interrupción de datos o una página de copia en escritura.
+
+\item \textbf{Traducción física a virtual}. Nos referimos a esto arriba como el mapa central. El sistema operativo debe realizar un seguimiento de los procesos que se asignan a una ubicación de memoria física específica, para asegurarse de que cuando el núcleo actualice el estado de una página, también puede actualizar cada entrada de tabla de páginas que haga referencia a esa página física.
+\end{itemize}
+
+Las más interesantes son las estructuras de datos utilizadas para la traducción virtual a física. Para la tabla de páginas de software, tenemos todas las mismas opciones que antes con respecto a la segmentación y varios niveles de paginación, así como algunos otros. La tabla de páginas de software no necesita utilizar la misma estructura que la tabla de página de hardware subyacente; De hecho, si el sistema operativo debe ser fácilmente portátil, las estructuras de datos de software pueden ser muy diferentes del hardware subyacente.
+
+Linux modela las estructuras de datos de traducción de direcciones internas del sistema operativo después de la arquitectura x86 de segmentos más tablas de páginas multinivel. Esto ha hecho que el portado de Linux a nuevas arquitecturas x86 sea relativamente fácil, pero portar Linux a otras arquitecturas algo más difícil.
+
+Un enfoque diferente, tomado primero en un sistema de investigación llamado Mach y más tarde en Apple OS X, es usar una tabla hash, en lugar de un árbol, para los datos de traducción de software. Por razones históricas, el uso de una tabla hash para la conversión de direcciones paginadas se denomina tabla de páginas invertida. Particularmente a medida que pasamos a tablas de páginas multinivel más profundas, el uso de una tabla hash para la traducción puede acelerar la traducción. Con una tabla de páginas invertida, el número de página virtual se hacha en una tabla de tamaño proporcional al número de marcos de página física. Cada entrada en la tabla hash contiene tuplas del formulario.
+
+Si hay una coincidencia en el número de página virtual y el ID de proceso, entonces la traducción es válida. Algunos sistemas realizan una búsqueda en dos etapas: primero mapean la dirección virtual a un ID de objeto de memoria y, a continuación, realizan la búsqueda de tabla hash en la dirección virtual relativa dentro del objeto de memoria. Si la memoria se comparte en su mayoría, esto puede ahorrar espacio en la tabla hash sin ralentizar indebidamente la traducción.
+
+Una tabla de página invertida necesita alguna manera de manejar las colisiones de hash, cuando dos direcciones virtuales se asignan a la misma entrada de tabla hash. Las técnicas estándar, como el encadenamiento o el rehashing, pueden utilizarse para manejar colisiones.
+
+Una consecuencia particularmente útil de tener una capa de portabilidad para la gestión de memoria es que el contenido de la tabla de traducción multinivel de hardware se puede tratar como una pista. Una sugerencia es el resultado de algún cálculo cuyos resultados ya no son válidos, pero donde el uso de una sugerencia no válida activará una excepción.
+
+Con una capa de portabilidad, la tabla de páginas de software es la verdad de fondo, mientras que la tabla de página de hardware es una pista. La tabla de páginas de hardware se puede utilizar con seguridad, siempre que las traducciones y permisos sean un subconjunto de las traducciones en la tabla de páginas de software.
+
+
+\setcounter{chapter}{10}
+\chapter{Sistema de Archivos: Introducción y Visión General}
 Los ordenadores deben poder almacenar de forma fiable los datos. Las personas almacenan fotos familiares, archivos de música y carpetas de correo electrónico. Los programadores almacenan documentos de diseño y archivos de origen. De hecho, para que una computadora trabaje en absoluto, necesita poder almacenar programas para funcionar y el sistema operativo, en sí mismo.
 
 Para todos estos casos, los usuarios exigen mucho de sus sistemas de almacenamiento:
@@ -1646,7 +1813,7 @@ Los programas utilizan una variedad de técnicas para hacer frente a este tipo d
 
 Otros programas esencialmente construyen un sistema de archivos en miniatura sobre la parte superior del subyacente, estructurando sus datos para que el sistema de archivos subyacente pueda satisfacer mejor sus requisitos de rendimiento y confiabilidad.
 
-\section{11.1 La abstracción del sistema de archivos}
+\section{La abstracción del sistema de archivos}
 Hoy en día, casi cualquier persona que utiliza una computadora está familiarizada con la abstracción del sistema de archivos de alto nivel. Los sistemas de archivos proporcionan a los usuarios una forma de organizar sus datos y almacenarlos durante largos períodos de tiempo.
 
 Más precisamente, un sistema de archivos es una abstracción del sistema operativo que proporciona datos persistentes y nombrados. Los datos persistentes se almacenan hasta que se borran explícitamente, incluso si la computadora que lo almacena se bloquea o pierde energía. Se puede acceder a los datos nombrados a través de un identificador legible por humanos que el sistema de archivos asocia con el archivo. Tener un nombre permite que se acceda a un archivo incluso después de que el programa que lo creó ha salido y permite que sea compartido por múltiples aplicaciones.
@@ -1703,7 +1870,7 @@ Un único equipo puede utilizar varios sistemas de archivos almacenados en vario
 Por ejemplo, suponga que una unidad USB contiene un sistema de archivos con los directorios \textit{/Películas} y \textit{/Backup} como se muestra en la Figura \ref{fig1101}. Si Alice conecta esa unidad en su computadora portátil, el sistema operativo del portátil podría montar el sistema de archivos del volumen USB con la ruta \textit{/Volúmenes/usb1/} como se muestra en la Figura \ref{fig1102}. Luego, si Alice llama abierta \textit{/Volumes/usb1/Movies/vacation.mov}, abrirá el archivo \textit{/Movies/vacation.mov} del sistema de archivos en el volumen de la unidad USB. Si, en cambio, Bob se conecta a su computadora portátil, el sistema operativo del portátil podría montar el sistema de archivos del volumen con la ruta \textit{/media/disk-1}, y Bob accedería al mismo archivo usando la ruta \textit{/media/disk-1/Películas/Vacation.mov}.
 
 
-\section{11.2 API}
+\section{API}
 \textbf{Creación y Eliminación de Archivos y Directorios.}
 
 Los procesos crean y destruyen archivos con \textit{create()} y \textit{unlink()}. Create() hace dos cosas: crea un archivo nuevo que tiene metadatos iniciales pero no otros datos y crea un nombre para ese archivo en un directorio.
@@ -1729,6 +1896,287 @@ Mientras un archivo está abierto, una aplicación puede acceder a los datos del
 En lugar de usar \textit{read()} y \textit{write()} para acceder a los datos de un archivo, una aplicación puede usar \textit{mmap()} para establecer una correlación entre una región de la memoria virtual del proceso y alguna región del archivo. Una vez que se ha asignado un archivo, la memoria carga y almacena en esa región de memoria virtual leerá y escribirá los datos del archivo, ya sea accediendo a una página compartida desde la caché de archivos del kernel o activando una excepción de fallo de página que haga que el kernel busque el archivo deseado Página de datos del sistema de archivos en la memoria. Cuando una aplicación se realiza con un archivo, puede llamar a \textit{munmap()} para eliminar las asignaciones.
 
 Por último, la llamada \textit{fsync()} es importante para la confiabilidad. Cuando una aplicación actualiza un archivo a través de \textit{write()} o un almacén de memoria en un archivo asignado, las actualizaciones se guardan en memoria intermedia y se guardan en un almacenamiento estable en un futuro. \textit{Fsync()} garantiza que todas las actualizaciones pendientes de un archivo se escriban en almacenamiento persistente antes de que se devuelva la llamada. Las aplicaciones utilizan esta función para dos propósitos. En primer lugar, llamar a \textit{fsync()} asegura que las actualizaciones sean duraderas y no se perderán si hay un fallo o un fallo de energía. En segundo lugar, llamar a \textit{fsync()} entre dos actualizaciones asegura que la primera se escribe en el almacenamiento persistente antes de la segunda. Tenga en cuenta que llamar a \textit{fsync()} no siempre es necesario; El sistema operativo garantiza que todas las actualizaciones se hagan duraderas al limpiar periódicamente todos los bloques de archivos sucios a un almacenamiento estable.
+
+
+\setcounter{chapter}{12}
+\chapter{Archivos y directorios}
+Recordemos que los sistemas de archivos utilizan directorios para proporcionar archivos nombrados de manera jerárquica y que cada archivo contiene \textbf{metadatos} y una secuencia de bytes de datos. Sin embargo, los dispositivos de almacenamiento proporcionan una abstracción de mucho menor nivel: grandes matrices de bloques de datos. Por lo tanto, para implementar un sistema de archivos, debemos resolver un problema de traducción: ¿Cómo vamos desde un nombre de archivo y desplazamiento a un número de bloque?
+
+Una respuesta simple es que los sistemas de archivos implementan un diccionario que mapea claves (nombre de archivo y desplazamiento) a valores (número de bloque en un dispositivo). De todas formas, los diseñadores de sistemas de archivos se enfrentan a cuatro grandes desafíos:
+\begin{itemize}
+\item \textbf{Rendimiento}. Los sistemas de archivos deben mantener un buen rendimiento mientras realizan copias con las limitaciones relacionadas a los dispositivos de almacenamiento subyacentes. En la práctica, esto significa que los sistemas de archivos se esfuerzan por asegurar una buena \textit{localidad espacial}, donde los bloques que se acceden juntos se almacenan cerca uno de otro, idealmente en bloques de almacenamiento secuencial.
+\item \textbf{Flexibilidad}. Uno de los principales objetivos de los sistemas de archivos es permitir que las aplicaciones compartan datos, por lo que los sistemas de archivos deben estar preparados para todo tipo de usos. Serían menos útiles si tuviéramos que usar un sistema de archivos para archivos grandes de lectura secuencial, otro para archivos pequeños rara vez escritos, otro para archivos grandes de acceso aleatorio, otro para archivos de corta duración, etc.
+\item \textbf{Persistencia}. Los sistemas de archivos deben mantener y actualizar tanto los datos de usuario como sus estructuras internas de datos en los dispositivos de almacenamiento persistentes para que todo sobreviva a fallos del sistema operativo y a fallos de alimentación.
+\item \textbf{Confiabilidad}. Los sistemas de archivos deben ser capaces de almacenar datos importantes durante largos períodos de tiempo, incluso si las máquinas se bloquean durante las actualizaciones o se produjeran fallas en el hardware de almacenamiento del sistema.
+\end{itemize}
+
+\section{Vistazo de la implementación}
+Los sistemas de archivos deben asignar nombres de archivos y desplazamientos a bloques físicos de almacenamiento de manera que permitan un acceso eficiente. Aunque existen muchos sistemas de archivos diferentes, la mayoría de las implementaciones se basan en cuatro ideas clave: directorios, estructuras de índices, mapas de espacio libre y heurísticas de localidades.
+
+\begin{figure}[tbhp]
+\centerline{\includegraphics[scale=0.65]{img/fig1301}}
+\caption{Los sistemas de archivos asignan nombres de archivos y desplazamientos de archivos a bloques de almacenamiento en dos pasos. En primer lugar, utilizan directorios para asignar nombres a números de archivo. A continuación, utilizan una estructura de índice como un árbol almacenado de forma persistente para encontrar el bloque que contiene los datos en cualquier desplazamiento específico en ese archivo.}
+\label{fig1301}
+\end{figure}
+
+\textbf{Directorios y estructuras de índices}. Como se ilustra en la \textit{Fig.} \ref{fig1301}, los sistemas de archivos asignan nombres de archivos y conjuntos de archivos a bloques de almacenamiento específicos en dos pasos.
+
+En primer lugar, utilizan directorios para asignar nombres de archivo legibles por humanos a números de archivo. Los directorios a menudo son sólo archivos especiales que contienen listas de asignaciones \textit{nombre de archivo} $\rightarrow$ \textit{número de archivo}.
+
+En segundo lugar, una vez que un nombre de archivo se ha traducido a un número de archivo, los sistemas de archivos utilizan una estructura de índice almacenada de forma persistente para localizar los bloques del archivo. La estructura de índice puede ser cualquier estructura de datos persistente que asigna un número de archivo y un desplazamiento a un bloque de almacenamiento. A menudo, para soportar eficientemente una amplia gama de tamaños de archivo y patrones de acceso, la estructura de índice es una forma de árbol.
+
+\textbf{Mapas de espacio libre}. Los sistemas de archivos implementan mapas de espacio libre para rastrear qué bloques de almacenamiento están libres y qué bloques están en uso a medida que los archivos crecen y se contraen. Como mínimo, el mapa de espacio libre del sistema de archivos debe permitir que éste encuentre un bloque libre cuando un archivo necesita crecer, pero debido a que la ubicación espacial es importante, la mayoría de los sistemas de archivos modernos implementan mapas de espacio libre que les permiten encontrar bloques libres cerca de una ubicación deseada. Por ejemplo, muchos sistemas de archivos implementan mapas de espacio libre como mapas de bits en almacenamiento persistente.
+
+\textbf{Heurística de la localidad}. Los directorios y las estructuras de índices permiten a los sistemas de archivos localizar los datos de archivo y los metadatos deseados sin importar dónde se almacenen, y los mapas de espacio libre les permiten localizar el espacio libre cerca de cualquier ubicación del dispositivo de almacenamiento persistente. Estos mecanismos permiten a los sistemas de archivos emplear varias políticas para decidir dónde debe almacenarse un bloque dado de un archivo dado.
+
+Estas políticas se materializan en \textit{heurísticas de localidad} para agrupar datos para optimizar el rendimiento. Por ejemplo, algunos sistemas de archivos agrupan los archivos de cada directorio, pero esparcen diferentes directorios a diferentes partes del dispositivo de almacenamiento. Otros desfragmentan periódicamente su almacenamiento, reescribiendo los archivos existentes para que cada archivo se almacene en bloques de almacenamiento secuencial y de modo que el dispositivo de almacenamiento tenga largas secuencias de espacio libre secuencial para que los nuevos archivos se puedan escribir secuencialmente. Y otros optimizan escrituras vs. lecturas, y escriben todos los datos secuencialmente, si un conjunto dado de escrituras contiene actualizaciones a un archivo o a muchos otros.
+
+\section{Directorios: nombres de datos}
+Como indica la \textit{Fig.} \ref{fig1301} para acceder a un archivo, el sistema de archivos traduce primero el nombre del archivo a su número. Por ejemplo, el archivo denominado {\mf /home/tom/foo.txt} puede conocerse internamente como archivo {\mf 66212871}. Los sistemas de archivos utilizan directorios para almacenar sus asignaciones de nombres legibles por humanos a números de archivos internos y organizan estos directorios de forma jerárquica para que los usuarios puedan agrupar Archivos relacionados y directorios.
+
+\begin{figure}[tbhp]
+\centerline{\includegraphics[scale=0.45]{img/fig1302}}
+\caption{Un directorio es un archivo que contiene una colección de asignaciones (\textit{nombre de archivo} $\rightarrow$ \textit{número de archivo}).}
+\label{fig1302}
+\end{figure}
+
+La implementación de directorios de una manera que proporciona mapeos jerárquicos de nombre a número resulta ser simple: se utilizan archivos para almacenar directorios. Por lo tanto, si el sistema necesita determinar el número de un archivo, sólo puede abrir el archivo de directorio apropiado y escanear a través de los pares (nombre de archivo/número de archivo) hasta encontrar el correcto.
+
+Por ejemplo, la \textit{Fig.} \ref{fig1302} ilustra el contenido de un único archivo de directorio. Para abrir el archivo {\mf foo.txt}, el sistema de archivos analizará este archivo de directorio, encontrará la entrada {\mf foo.txt} y verá que el archivo {\mf foo.txt} tiene el número de archivo {\mf 66212871}.
+
+\begin{figure}[tbhp]
+\centerline{\includegraphics[scale=0.45]{img/fig1303}}
+\caption{Los directorios pueden organizarse jerárquicamente al tener un directorio que contenga la asignación (\textit{nombre de archivo} $\rightarrow$ \textit{número de archivo}) para otro directorio.}
+\label{fig1303}
+\end{figure}
+
+Por supuesto, si usamos archivos para almacenar el contenido de directorios como {\mf /home/tom}, todavía tenemos el problema de encontrar los archivos de directorio en sí. Como se muestra en la \textit{Fig.} \ref{fig1303}, el número de archivo del directorio {\mf /home/tom} se puede encontrar buscando el nombre {\mf tom} en el directorio {\mf /home} y el número de archivo para directorio {\mf /home} se puede buscar buscando el nombre {\mf home} en el directorio raíz {\mf /}.
+
+Los algoritmos recursivos necesitan un caso base: no podemos descubrir el número de archivo de directorios raíz mirando en algún otro directorio. La solución es acordar el número de archivo del directorio raíz con antelación. Por ejemplo, el \textbf{Fast File System} (FFS) de Unix y muchos otros sistemas de archivos Unix y Linux usan {\mf 2} como el número de archivo predefinido para el directorio raíz de un sistema de archivos.
+
+Por lo tanto, para leer el archivo {\mf /home/tom/foo.txt} en la \textit{Fig.} \ref{fig1303}, leemos primero el directorio raíz leyendo el archivo con la bien conocida raíz número {\mf 2}. En ese archivo, buscamos el nombre {\mf home} y encontramos que directorio {\mf /home} está almacenado en el archivo {\mf 88026158}. Leyendo el archivo {\mf 88026158} y buscando el nombre {\mf tom}, aprendemos que directorio {\mf /home/tom} está almacenado en el archivo {\mf 5268830}. Finalmente, por Leyendo archivo {\mf 5268830} y buscando el nombre {\mf foo.txt}, nos enteramos de que {\mf /home/tom/foo.txt} es el número de archivo {\mf 66212871}.
+
+Aunque buscar el número de un archivo puede tomar varios pasos, esperamos que haya localidad (por ejemplo, cuando se accede a un archivo en un directorio, es muy probable que pronto se acceda a otros archivos del mismo directorio), por lo que esperamos que el almacenamiento en caché reduzca el número de accesos de disco necesarios para la mayoría de las búsquedas.
+
+\textbf{API de directorios}. Los directorios utilizan una API especializada porque deben controlar el contenido de estos archivos. Por ejemplo, los sistemas de archivos deben evitar que las aplicaciones corrompan la lista de asignaciones (\textit{nombre de archivo} $\rightarrow$ \textit{número de archivo}), lo que podría impedir que el sistema operativo realice búsquedas o actualizaciones. Como otro ejemplo, el sistema de archivos debe hacer cumplir el invariante de que cada número de archivo en una entrada de directorio válida se refiere a un archivo que realmente existe.
+
+Por lo tanto, los sistemas de archivos proporcionan llamadas especiales al sistema para modificar los archivos de directorio. Por ejemplo, en lugar de utilizar la llamada de sistema de escritura estándar para agregar una entrada de un nuevo archivo a un directorio, las aplicaciones utilizan la llamada {\mf create}. Al restringir las actualizaciones, estas llamadas garantizan que los archivos de directorio siempre pueden ser analizados por el sistema operativo. Estas llamadas también enlazan la creación o eliminación de un archivo y la entrada de directorio del archivo, de modo que las entradas de directorio siempre se refieren a archivos reales y que todos los archivos tienen al menos una entrada de directorio.
+
+\textbf{Detalles internos de los directorios}. Muchas de las primeras implementaciones de sistemas de archivos simplemente almacenaban listas lineales de pares (nombre de archivo/número de archivo) en archivos de directorio. Por ejemplo, en la versión original del sistema de archivos ext2 de Linux, cada archivo de directorio almacenaba una lista vinculada de entradas de directorio como se ilustra en la \textit{Fig.} \ref{fig1304}.
+
+\begin{figure}[tbhp]
+\centerline{\includegraphics[scale=0.50]{img/fig1304}}
+\caption{Una implementación de lista vinculada de un directorio. Este ejemplo muestra un archivo de directorio que contiene cinco entradas: {\mf music}, {\mf work} y {\mf foo.txt}, junto con {\mf .} (el directorio actual) y {\mf ..} (el directorio padre).}
+\label{fig1304}
+\end{figure}
+
+Las listas simples funcionan bien cuando el número de entradas de directorio es pequeño. Una vez que un directorio tiene unos pocos miles de entradas, los directorios basados en listas simples se vuelven lentos.
+
+Para soportar de forma eficaz directorios con muchas entradas, muchos sistemas de archivos recientes, incluyendo XFS de Linux y NTFS de Microsoft, entre otros, aumentan la lista vinculada subyacente con una estructura adicional basada en hash para acelerar las búsquedas. Estos sistemas de archivos implementan registros de directorio que mapean nombres de archivo a números de archivo y dichas asignaciones se almacenan en un \textbf{árbol B+} indexado por el hash del nombre de cada archivo. Para encontrar el número de archivo de un nombre de archivo dado, el sistema de archivos calcula primero un hash del nombre. A continuación, utiliza ese hash como clave para buscar la entrada del directorio en el árbol: comenzando en la raíz del árbol B+ en un desplazamiento bien conocido en el archivo y procediendo a través de los nodos internos hacia los nodos hoja del árbol. En cada nivel, un nodo contiene una matriz de pares (clave de hash/desplazamiento de archivo) que representan cada uno un puntero al nodo secundario que contiene entradas con claves más pequeñas que la clave de hash pero mayores que la clave de hash de la entrada anterior. El sistema de archivos busca en el nodo la primera entrada con un valor de clave de hash que excede la clave de destino y, a continuación, sigue el puntero de desplazamiento de archivo correspondiente al nodo secundario correcto. El puntero de desplazamiento de archivo en el registro en los nodos hoja apunta a la entrada de directorio de destino.
+
+\textbf{Hard y soft links}. Muchos sistemas de archivos permiten que un archivo dado tenga varios nombres. Los \textbf{hard links} o enlaces duros son varias entradas de directorio de archivos que asignan nombres de ruta diferentes al mismo número de archivo. Debido a que un número de archivo puede aparecer en varios directorios, los sistemas de archivos deben asegurarse de que un archivo sólo se elimina cuando se ha eliminado el último hard link.
+
+Para implementar correctamente la recolección de basura, los sistemas de archivos usan recuentos de referencia almacenando con cada archivo el número de enlaces duros a él. Cuando se crea un archivo, tiene un recuento de referencia de uno, y cada enlace duro adicional hecho al archivo incrementa su recuento de referencias. Por el contrario, cada llamada a desvincular disminuye el recuento de referencia del archivo y cuando el recuento de referencia cae a cero, el archivo subyacente se elimina y sus recursos se marcan como libres.
+
+Por otra parte, en lugar de asignar un nombre de archivo a un número de archivo, los \textbf{soft links} o enlaces simbólicos son entradas de directorio que asignan un nombre a otro nombre.
+
+\begin{figure}[tbhp]
+\centerline{\includegraphics[scale=0.50]{img/fig1305}}
+\caption{En este directorio, los hard links {\mf foo.txt} y {\mf bar.txt} y el soft link {\mf baz.txt} se refieren todos al mismo archivo.}
+\label{fig1305}
+\end{figure}
+
+Por ejemplo, \textit{Fig.} \ref{fig1305} muestra un directorio que contiene tres nombres y todos se refieren al mismo archivo. Las entradas {\mf foo.txt} y {\mf bar.txt} son enlaces duros con el mismo archivo (número 66212871); {\mf baz.txt} es un enlace suave a {\mf foo.txt}. Debe notarse que si eliminamos la entrada {\mf foo.txt} de este directorio utilizando la llamada de sistema de desvinculación, el archivo todavía se puede abrir con el nombre {\mf bar.txt}, pero si intentamos abrirlo con el nombre {\mf baz.txt}, el intento fallará.
+
+
+\section{Archivos: Búsqueda de datos}
+Una vez que un sistema de archivos ha traducido un nombre de archivo a un número de archivo utilizando un directorio, el sistema de archivos debe ser capaz de encontrar los bloques que pertenecen a ese archivo. Además de este requisito funcional, las implementaciones de archivos suelen tener como objetivo otros cinco objetivos:
+\begin{itemize}
+\item Soportar la colocación secuencial de datos para maximizar el acceso secuencial a archivos.
+\item Proporcionar acceso aleatorio eficiente a cualquier bloque de archivos.
+\item Limitar las cargas de sistema (\textit{overheads}) para ser eficiente para archivos pequeños.
+\item Ser escalable para admitir archivos grandes.
+\item Proporcionar un lugar para almacenar metadatos por archivo, como el número de referencia del archivo, el propietario, la lista de control de acceso, el tamaño y el tiempo de acceso.
+\end{itemize}
+
+\subsection{FAT: Lista enlazada}
+El sistema de archivos \textbf{FAT -- File Allocation Table} de Microsoft (Tabla de Asignación de Archivos) se implementó por primera vez a finales de los años setenta y era el sistema de archivos principal para MS-DOS y las primeras versiones de Microsoft Windows. El sistema de archivos FAT se ha mejorado de muchas maneras a lo largo de los años. La versión FAT-32 soporta volúmenes con hasta $2^{28}$ bloques y archivos con hasta $2^{32} - 1$ bytes.
+
+\textbf{Estructuras de índices}. El sistema de archivos FAT recibe el nombre de su tabla de asignación de archivos, una matriz de entradas de 32 bits en un área reservada del volumen. Cada archivo del sistema corresponde a una lista vinculada de entradas FAT, con cada entrada FAT conteniendo un puntero a la siguiente entrada FAT del archivo (o un valor especial de ``fin de archivo''). La FAT tiene una entrada para cada bloque en el volumen y los bloques del archivo son los bloques que corresponden a las entradas FAT del archivo: si la entrada FAT i es la entrada i-ésima de un archivo, entonces el bloque de almacenamiento i es el i-ésimo bloque de datos del archivo.
+
+\begin{figure}[tbhp]
+\centerline{\includegraphics[scale=0.65]{img/fig1306}}
+\caption{Un sistema de archivos FAT con un archivo de 5 bloques y un archivo de 2 bloques.}
+\label{fig1306}
+\end{figure}
+
+La \textit{Fig.} \ref{fig1306} ilustra un sistema de archivos FAT con dos archivos. La primera comienza en el bloque {\mf 9} y contiene cinco bloques. El segundo comienza en el bloque {\mf 12} y contiene dos bloques.
+
+Los directorios asignan nombres de archivo a números de archivo y, en el sistema de archivos FAT, el número de un archivo es el índice de la primera entrada del archivo en el FAT. Por lo tanto, dado el número de un archivo, podemos encontrar la primera entrada FAT y el bloque de un archivo, y dada la primera entrada FAT, podemos encontrar el resto de las entradas y bloques FAT del archivo.
+
+\textbf{Seguimiento de espacio libre}. FAT también se utiliza para el seguimiento de espacio libre. Si el bloque de datos i está libre, entonces FAT[i] contiene un 0. Así, el sistema de archivos puede encontrar un bloque libre escaneando a través de la FAT para encontrar una entrada cero.
+
+\textbf{Heurística de localidad}. Diferentes implementaciones de FAT pueden utilizar diferentes estrategias de asignación, pero las estrategias de asignación de implementaciones de FAT son generalmente simples. Por ejemplo, algunas implementaciones utilizan un algoritmo de ajuste siguiente (\textit{next fit}) que escanea secuencialmente a través de la FAT a partir de la última entrada asignada y que devuelve la siguiente entrada libre encontrada.
+
+Estrategias de asignación simples como ésta pueden fragmentar un archivo, extendiendo los bloques del archivo a través del volumen en lugar de lograr el diseño secuencial deseado. Para mejorar el rendimiento, los usuarios pueden ejecutar una herramienta de \textbf{desfragmentación} que lee archivos de sus ubicaciones existentes y los vuelve a escribir a nuevas ubicaciones con una mejor localidad espacial. El desfragmentador FAT en Windows XP, por ejemplo, intenta copiar los bloques de cada archivo que se extiende a través de múltiples extensiones a una extensión secuencial única que contiene todos los bloques de un archivo.
+
+\textbf{Usos y limitaciones}. El sistema de archivos FAT se utiliza ampliamente porque es simple y compatible con muchos sistemas operativos. Por ejemplo, muchas dispositivos de almacenamiento flash  USB y tarjetas de almacenamiento de cámaras utilizan el sistema de archivos FAT, permitiendo que sean leídos y escritos por casi cualquier computadora que ejecute casi cualquier sistema operativo moderno.
+
+El sistema de archivos FAT, sin embargo, está limitado de muchas maneras. Por ejemplo,
+\begin{itemize}
+\item \textbf{Pobre empleo de la localidad}. Las implementaciones de FAT suelen utilizar estrategias de asignación sencillas, como el ajuste siguiente ya descrito. Estos pueden conducir a archivos mal fragmentados.
+\item \textbf{Acceso aleatorio deficiente}. El acceso aleatorio dentro de un archivo requiere el desplazamiento secuencial de las entradas FAT del archivo hasta que se alcance el bloque deseado.
+\item \textbf{Metadatos limitados de archivos y control de acceso}. Los metadatos de cada archivo incluyen información como el nombre, el tamaño y el tiempo de creación del archivo, pero no incluyen información de control de acceso, como el propietario del archivo o el ID de grupo, para que cualquier usuario pueda leer o escribir cualquier archivo almacenado en un sistema de archivos FAT.
+\item \textbf{No hay soporte para enlaces duros}. FAT representa cada archivo como una lista vinculada de entradas de 32 bits en la tabla de asignación de archivos. Esta representación no incluye espacio para otros metadatos de archivo. En su lugar, los metadatos de archivo son almacenados como entradas de directorio con el nombre del archivo. Este enfoque exige que cada archivo se acceda a través de una entrada de directorio exactamente, descartando múltiples enlaces duros a un archivo.
+\item \textbf{Limitaciones en volumen y tamaño de archivo}. Las entradas de tabla FAT son de 32 bits, pero los cuatro bits superiores se encuentran reservados. Así, un volumen FAT puede tener como máximo $2^{28}$ bloques. Con bloques de 4 KB, el tamaño máximo de volumen está limitado (por ejemplo, $2^{28} \frac{\text{bloques}}{\text{volumen}} \times 2^{12}\frac{\text{bytes}}{\text{bloque}} = 2^{40}\frac{\text{bytes}}{\text{volumen}} =$ 1 TB). Se admiten bloques de hasta 256 KB, pero se corre el riesgo de perder grandes cantidades de espacio en disco debido a la fragmentación interna. Del mismo modo, los tamaños de archivo se codifican en 32 bits, por lo que ningún archivo puede ser mayor que $2^{32} - 1$ bytes (poco menos de 4 GB).
+\item \textbf{Falta de soporte para técnicas modernas de confiabilidad}. FAT no admite las técnicas de actualización transaccional que
+los sistemas de archivos modernos utilizan para evitar la corrupción de las estructuras de datos críticos si el equipo se bloquea mientras se escribe en el almacenamiento.
+\end{itemize}
+
+
+\subsection{FFS: Árbol fijo}
+El \textbf{Sistema de Archivos Rápido} de Unix (FFS: \textit{Fast File System}) ilustra ideas importantes para la indexación de los bloques de un archivo para que puedan localizarse rápidamente y para colocar los datos en el disco para obtener una buena localidad. En particular, la estructura de índice de FFS, denominada índice multinivel, es un árbol cuidadosamente estructurado que permite a FFS localizar cualquier bloque de un archivo y que es eficiente tanto para archivos grandes como pequeños. Dada la flexibilidad proporcionada por el índice de niveles múltiples de FFS, FFS emplea dos heurísticas de localidad -- colocación de grupo de bloque y espacio de reserva -- que juntas suelen proporcionar un buen diseño en disco.
+
+\textbf{Estructuras de índices}. Para realizar un seguimiento de los bloques de datos que pertenecen a cada archivo, FFS utiliza un árbol asimétrico fijo denominado \textbf{índice multinivel}, como se ilustra en la \textit{Fig.} \ref{fig1307}.
+
+\begin{figure}[tbhp]
+\centerline{\includegraphics[scale=0.65]{img/fig1307}}
+\caption{Un inodo FFS es la raíz de un árbol asimétrico cuyas hojas son los bloques de datos de un archivo.}
+\label{fig1307}
+\end{figure}
+
+Cada archivo es un árbol con bloques de datos de tamaño fijo (por ejemplo, 4 KB) como sus hojas. El árbol de cada archivo está enraizado en un \textbf{inodo} que contiene los metadatos del archivo (por ejemplo, el propietario del archivo, los permisos de control de acceso, la hora de creación, la última hora modificada y si el archivo es un directorio o no). 
+
+El inodo de un archivo (raíz) también contiene una matriz de punteros para localizar los bloques de datos (hojas) del archivo. Algunos de estos punteros apuntan directamente a las hojas de datos del árbol y algunos apuntan a nodos internos en el árbol. Típicamente, un inodo contiene 15 punteros. Los primeros 12 punteros son \textbf{punteros directos} que apuntan directamente a los primeros 12 bloques de datos de un archivo.
+
+El puntero 13 es un \textbf{puntero indirecto}, que apunta a un nodo interno del árbol llamado \textbf{bloque indirecto}. Un bloque indirecto es un bloque regular de almacenamiento que contiene una matriz de punteros directos. Para leer el bloque 13 de un archivo, primero lee el inodo para obtener el puntero indirecto, luego el bloque indirecto para obtener el puntero directo, luego el bloque de datos. Con bloques de 4 KB y punteros de bloques de 4 bytes, un bloque indirecto puede contener hasta 1024 punteros directos, lo que permite archivos de hasta poco más de 4 MB.
+
+El puntero 14 es un \textbf{doble puntero indirecto}, que apunta a un nodo interno del árbol llamado \textbf{doble bloque indirecto}. Un doble bloque indirecto es una matriz de indicadores indirectos, cada uno de los cuales apunta a un bloque indirecto. Con bloques de 4 KB y punteros de bloques de 4 bytes, un bloque indirecto doble puede contener hasta 1024 punteros indirectos. Así, un puntero indirecto doble puede indexar tantos como $1024^2$ bloques de datos.
+
+Finalmente, el puntero 15 es un \textbf{puntero triple indirecto} que apunta a un \textbf{bloque indirecto triple} que contiene una matriz de punteros indirectos dobles. Con un bloque de 4 KB y un indicador de bloque de 4 bytes, un puntero indirecto triple puede indexar hasta $1024^3$ bloques de datos que contienen $4\text{ KB}\times 1024^3 = 2^{12} \times 2^{30} = 2^{42}$ bytes (4 TB).
+
+Todos los inodos de un sistema de archivos se encuentran en una matriz de inodos que se almacena en una ubicación fija en el disco. El número de archivo de un archivo, denominado \textbf{inúmero} (\textit{inumber}) en FFS, es un índice en la matriz inodo: para abrir un archivo (por ejemplo, {\mf foo.txt}), buscamos en el directorio del archivo para encontrar su número (por ejemplo, {\mf 91854}) y luego buscamos la entrada apropiada de la matriz de inodos (por ejemplo, la entrada {\mf 91854}) para encontrar sus metadatos.
+
+El índice multinivel de FFS tiene cuatro características importantes:
+\begin{enumerate}
+\item \textbf{Estructura del árbol}. Cada archivo se representa como un árbol, lo que permite al sistema de archivos encontrar eficientemente cualquier bloque de un archivo.
+\item \textbf{Alto grado}. El árbol FFS utiliza nodos internos con muchos hijos en comparación con los árboles binarios que se usan con frecuencia para estructuras de datos en memoria. Por ejemplo, si un bloque de archivo es de 4 KB y un bloque de ID es de 4 bytes, cada bloque indirecto puede contener punteros a 1024 bloques.
+
+Los nodos de alto grado tienen sentido para las estructuras de datos en disco donde (1) queremos minimizar el número de búsquedas, (2) el costo de leer varios kilobytes de datos secuenciales no es mucho mayor que el costo de leer el primer byte y (3) los datos deben ser leídos y escritos por lo menos un sector a la vez. Los nodos de alto grado también mejoran la eficiencia de lecturas y escrituras secuenciales. Una vez leído un bloque indirecto, se pueden leer cientos de bloques de datos antes de que se necesite el siguiente bloque indirecto. Las corridas entre las lecturas de bloques indirectos dobles son aún mayores.
+
+\item \textbf{Estructura fija}. El árbol FFS tiene una estructura fija. Para una configuración dada de FFS, el primer conjunto de {\mf d} punteros apunta siempre a los primeros {\mf d} bloques de un archivo; El siguiente puntero es un puntero indirecto que apunta a un bloque indirecto, etc. En comparación con un árbol dinámico que puede añadir capas de indirección por encima de un bloque a medida que crece un archivo, la principal ventaja de la estructura fija es la simplicidad de implementación.
+
+\item \textbf{Asimétrico}. Para soportar eficientemente archivos grandes y pequeños con una estructura de árbol fija, la estructura de árbol de FFS es asimétrica. En lugar de poner cada bloque de datos a la misma profundidad, FFS almacena sucesivos grupos de bloques a mayor profundidad para que los archivos pequeños se almacenen en un árbol de poca profundidad, la mayor parte de los archivos medianos se almacenan en un árbol de profundidad media y el volumen De los archivos grandes se almacenan en un árbol de mayor profundidad. Por ejemplo, un pequeño archivo de 4 bloques cuyo inodo incluye punteros directos a todos sus bloques. Por el contrario, para el archivo grande mostrado en la \textit{Fig.} \ref{fig1307}, la mayoría de los bloques deben ser accedidos a través del triple puntero indirecto.
+
+Por el contrario, si usamos un árbol de profundidad fija y queremos soportar archivos razonablemente grandes, los archivos pequeños pagarían altas sobrecargas (\textit{overheads}). Con punteros indirectos triples y bloques de 4 KB, almacenar un archivo de 4 KB consumiría más de 16 KB (el 4 KB de datos, el pequeño inodo y 3 niveles de bloques indirectos de 4 KB) y leer el archivo requeriría leer cinco bloques para atravesar el árbol.
+\end{enumerate}
+
+\textbf{Control de acceso FFS}. El inodo FFS contiene información para controlar el acceso a un archivo. El control de acceso se puede especificar para tres grupos de personas:
+\begin{itemize}
+\item \textbf{Usuario} (propietario). El usuario propietario del archivo.
+\item \textbf{Grupo}. Conjunto de personas pertenecientes a un grupo Unix especificado. Cada grupo Unix se especifica en otro lugar como un nombre de grupo y una lista de usuarios en ese grupo.
+\item \textbf{Otro}. Todos los demás usuarios.
+\end{itemize}
+
+El control de acceso se especifica en términos de tres tipos de actividades:
+\begin{itemize}
+\item \textbf{Leer}. Leer el archivo o directorio normal.
+\item \textbf{Escribir}. Modificar el archivo o directorio normal.
+\item \textbf{Ejecutar}. Ejecutar el archivo normal o recorrer el directorio para acceder a archivos o subdirectorios en él.
+\end{itemize}
+
+El inodo de cada archivo almacena las identidades del usuario (propietario) y grupo del archivo, así como 9 bits básicos de control de acceso para especificar el permiso de lectura / escritura / ejecución para el usuario del archivo (propietario) / grupo / otro. Por ejemplo, el comando {\mf ls -ld /} muestra la información de control de acceso para el directorio raíz:
+
+\begin{lstlisting}[style=Bash,numbers=none]
+> ls -ld /
+drwxr-xr-x 40 root wheel 1428 Feb 2 13:39 /
+\end{lstlisting}
+
+Esto significa que el archivo es un directorio ({\mf d}), propiedad del usuario {\mf root} del grupo {\mf wheel}. El directorio raíz puede ser leído, escrito y ejecutado (recorrido) por el propietario ({\mf rwx}), y puede ser leído y ejecutado (recorrido) pero no escrito por los miembros del grupo {\mf wheel} ({\mf r-x}) y todos los demás usuarios ({\mf r-x}).
+
+\textbf{Los programas setuid y setgid}. Además de los 9 bits de control de acceso básicos, el inodo FFS almacena dos bits adicionales importantes:
+\begin{itemize}
+\item \textbf{setuid}. Cuando este archivo es ejecutado por cualquier usuario (con permiso de ejecución) se ejecutará con el permiso del propietario del archivo (en lugar del usuario). Por ejemplo, el programa {\mf lprm} permite al usuario eliminar un trabajo de una cola de impresión. La cola de impresión se implementa como un directorio que contiene los archivos que se van a imprimir, y porque no queremos que los usuarios puedan eliminar trabajos de otros usuarios, este directorio es propiedad del usuario {\mf root} y sólo puede ser modificado por él. Por lo tanto, el programa {\mf lprm} es propiedad del usuario {\mf root} con el bit {\mf setuid} establecido. Puede ser ejecutado por cualquier persona, pero cuando se ejecuta, se ejecuta con permisos de {\mf root}, lo que le permite modificar el directorio de la cola de impresión.4
+
+Por supuesto, hacer un programa {\mf setuid} es potencialmente peligroso. Aquí, por ejemplo, confiamos en el programa {\mf lprm} para verificar que el usuario real está eliminando sus propios trabajos de impresión, no de otra persona. Un error en el programa {\mf lprm} podría permitir a un usuario eliminar los trabajos de otra impresora. Peor aún, si el error permite al atacante ejecutar código malicioso (por ejemplo, a través de un ataque de desbordamiento de búfer), un error en {\mf lprm} podría dar al atacante un control total de la máquina.
+
+\item \textbf{setgid}. El bit {\mf setgid} es similar al bit {\mf setuid}, excepto que el archivo se ejecuta con el permiso de grupo del archivo. Por ejemplo, en algunas máquinas, {\mf sendmail} se ejecuta como miembro del grupo {\mf smmsp} para que pueda acceder a un archivo de cola de correo accesible al grupo {\mf smmsp}.
+\end{itemize}
+
+\textbf{Archivos dispersos (sparse)}. Las estructuras de índices basadas en árboles como las FFS pueden admitir archivos dispersos en los que uno o más rangos de espacio vacío están rodeados por datos de archivo. Los rangos de espacio vacío no consumen espacio en disco. Por ejemplo, si creamos un nuevo archivo, escribimos 4 KB en el desplazamiento 0 con un puntero directo, buscamos el desplazamiento 230 y escribimos otro 4 KB con un doble puntero indirecto. Luego, un sistema FFS con bloques de 4 KB sólo consumirá 16 KB: dos bloques de datos, un bloque indirecto doble y un solo bloque indirecto. En este caso, si listamos el tamaño del archivo usando el comando {\mf ls}, vemos que el tamaño del archivo es 1.1 GB. Pero, si comprobamos el espacio consumido por el archivo, usando el comando {\mf du}, vemos que consume sólo 16 KB de espacio de almacenamiento.
+
+El soporte eficiente de archivos dispersos es útil para dar a las aplicaciones la máxima flexibilidad para colocar datos en un archivo. Por ejemplo, una base de datos podría almacenar sus tablas al comienzo de su archivo, sus índices en 1 GB en el archivo, su registro en 2 GB y metadatos adicionales a 4 GB.
+
+Los archivos dispersos tienen dos limitaciones importantes. En primer lugar, no todos los sistemas de archivos los soportan, por lo que una aplicación que depende de soporte de archivos dispersos no puede ser portátil. En segundo lugar, no todas las utilidades manejan correctamente los archivos dispersos, lo que puede llevar a consecuencias inesperadas.
+
+\textbf{Gestión del espacio libre}. La gestión del espacio libre de FFS es simple. FFS asigna un mapa de bits con un bit por bloque de almacenamiento. El i-ésimo bit en el mapa de bits indica si el i-ésimo bloque está libre o en uso. La posición del mapa de bits de FFS se fija cuando se formatea el sistema de archivos, por lo que es fácil encontrar la parte del mapa de bits que identifica bloques libres cerca de cualquier ubicación de interés.
+
+\textbf{Heurística de localidad}. FFS utiliza dos heurísticas de localidad importantes para obtener un buen rendimiento para muchas cargas de trabajo:
+\begin{itemize}
+\item \textbf{Colocación de grupo de bloque}. FFS coloca los datos para optimizar el caso común en el que se accede a los bloques de datos de un archivo, a los datos y metadatos de un archivo y a diferentes archivos del mismo directorio. Por el contrario, debido a que todo no puede estar cerca de todo, FFS permite que los archivos de diferentes directorios estén lejos uno del otro. Esta heurística de colocación tiene cuatro partes:
+\begin{enumerate}
+\item \textbf{Dividir el disco en grupos de bloques}. FFS divide un disco en conjuntos de pistas cercanas llamadas grupos de bloques. El tiempo de búsqueda entre los bloques de un grupo de bloques será pequeño.
+\item \textbf{Distribuir metadatos}. En FFS, la matriz de inodos y el mapa de bits de espacio libre siguen siendo conceptualmente matrices de registros y FFS aún almacena cada entrada de matriz en una ubicación bien conocida y fácilmente calculable, pero la matriz ahora se divide en piezas distribuidas a través del disco. En particular, cada grupo de bloques tiene una parte de estas estructuras de metadatos.
+\item \textbf{Colocar el archivo en el grupo de bloques}. FFS coloca un directorio y sus archivos en el mismo grupo de bloques: cuando se crea un nuevo archivo, FFS conoce el número del directorio del nuevo archivo y desde ese punto puede determinar el rango de números en el mismo grupo de bloques. FFS elige un inodo de ese grupo si uno está libre; De lo contrario, FFS abandona la localidad y selecciona un número de un grupo de bloques diferente. En contraste con los archivos regulares, cuando FFS crea un nuevo directorio, elige un inúmero de un grupo de bloques diferente. Aunque podríamos esperar un subdirectorio para tener alguna localidad con su padre, poner todos los subdirectorios en el mismo grupo de bloques rápidamente lo llenaría, frustrando nuestros esfuerzos para conseguir la localidad dentro de un directorio.
+\item \textbf{Colocar los bloques de datos}. Dentro de un grupo de bloques, FFS utiliza una primera heurística libre. Cuando se escribe un nuevo bloque de un archivo, FFS escribe el bloque en el primer bloque libre del grupo de bloques del archivo. Aunque esta heurística puede dejar de lado la localidad en el corto plazo, lo hace para mejorar la localidad a largo plazo. En el corto plazo, esta heurística podría extender una secuencia de escrituras en pequeños agujeros cerca del comienzo de un grupo de bloques en lugar de concentrarlos en una secuencia de bloques libres contiguos en algún otro lugar. Sin embargo, este sacrificio a corto plazo trae beneficios a largo plazo: la fragmentación se reduce, el bloque tiende a tener un largo plazo de espacio libre al final, las escrituras posteriores tienen más probabilidades de ser secuenciales.
+
+La intuición es que un grupo de bloques dado normalmente tendrá un puñado de agujeros esparcidos a través de bloques cerca del inicio del grupo y una gran cantidad de espacio libre al final del grupo. Entonces, si se crea un archivo pequeño, sus bloques probablemente irán a algunos de los pequeños agujeros, lo cual no es ideal, pero es aceptable para un archivo pequeño. Por el contrario, si se crea un archivo grande y se escribe desde el principio hasta el final, tenderá a que los primeros bloques se dispersen a través de los orificios en la primera parte del bloque, pero luego se tiene la mayor parte de los datos escritos secuencialmente al final del grupo de bloques.
+
+Si un grupo de bloques se queda sin bloques libres, FFS selecciona otro grupo de bloques y asigna bloques allí usando la misma heurística.
+\end{enumerate}
+
+\item \textbf{Espacio reservado}. Aunque la heurística de grupos de bloques puede ser efectiva, se basa en que existe una cantidad significativa de espacio libre en el disco. En particular, cuando un disco está casi lleno, hay poca oportunidad para que el sistema de archivos optimice la localidad. Por ejemplo, si un disco tiene sólo unos pocos kilobytes de sectores libres, la mayoría de los grupos de bloques estarán llenos y otros tendrán sólo unos cuantos bloques libres. Las nuevas escrituras tendrán que ser dispersas más o menos al azar por todo el disco.
+
+FFS por lo tanto, reserva una parte del espacio del disco (por ejemplo, 10\%) y presenta un tamaño de disco ligeramente reducido a las aplicaciones. Si el espacio libre real en el disco cae por debajo de la fracción de reserva, FFS trata el disco como lleno. Por ejemplo, si la aplicación de un usuario intenta escribir un nuevo bloque en un archivo cuando se consuma todo menos el espacio de reserva, esa escritura fallará. Cuando todo, excepto el espacio de reserva está lleno, los procesos del superusuario seguirán siendo capaces de asignar nuevos bloques, lo cual es útil para permitir que un administrador inicie sesión y limpie las cosas.
+
+El enfoque de Espacio reservado funciona bien teniendo en cuenta las tendencias en tecnología de discos. Se sacrifica una pequeña cantidad de capacidad de disco, un recurso de hardware que ha estado mejorando rápidamente en las últimas décadas, y reducir tiempos de búsqueda, una propiedad de hardware que ha mejorando más lentamente.
+\end{itemize}
+
+
+\subsection{NTFS: árbol flexible con extensiones}
+El Sistema de Archivos de Nueva Tecnología de Microsoft (NTFS: \textit{New Technology File System}), lanzado en 1993, mejoró el sistema de archivos FAT de Microsoft con muchas nuevas características, incluyendo nuevas estructuras de índice para mejorar el rendimiento, metadatos de archivos más flexibles, mayor seguridad y mayor confiabilidad.
+
+\textbf{Estructuras de índices}. Mientras que FFS rastrea los bloques de archivos con un árbol fijo, NTFS y muchos otros sistemas de archivos recientes, tales como ext4 de Linux, rastrean extensiones con \textit{árboles flexibles}.
+\begin{itemize}
+\item \textbf{Extensiones}. En lugar de rastrear bloques de archivos individuales, NTFS rastrea extensiones, regiones de tamaño variable de archivos que se almacenan cada una en una región contigua en el dispositivo de almacenamiento.
+\item \textbf{Árbol flexible y tabla maestra de archivos}. Cada archivo en NTFS está representado por un árbol de profundidad variable. Los punteros de extensión para un archivo con un pequeño número de extensiones se pueden almacenar en un árbol superficial, incluso si el archivo, en sí mismo, es grande. Los árboles más profundos sólo son necesarios si el archivo se vuelve muy fragmentado.
+\end{itemize}
+
+Las raíces de estos árboles se almacenan en una tabla de archivos maestros que es similar a la matriz de inodos de FFS. La tabla de archivos maestros (MFT: \textit{Master File Table}) de NTFS almacena una matriz de registros MFT de 1 KB, cada uno de los cuales almacena una secuencia de registros de atributos de tamaño variable. NTFS utiliza registros de atributos para almacenar datos y metadatos, ambos son considerados atributos de un archivo.
+
+Algunos atributos pueden ser demasiado grandes para encajar en un registro MFT (por ejemplo, una extensión de datos) mientras que algunos pueden ser lo suficientemente pequeños para encajar (por ejemplo, la fecha y hora de última modificación de un archivo). Por lo tanto, un atributo puede ser residente o no residente. Un \textbf{atributo residente} almacena su contenido directamente en el registro MFT mientras que un \textbf{atributo no residente} almacena punteros de extensión en su registro MFT y almacena su contenido en esas extensiones.
+
+\begin{figure}[tbhp]
+\centerline{\includegraphics[scale=0.65]{img/fig1308}}
+\caption{Estructuras de índices NTFS y datos para un archivo básico con dos extensiones de datos.}
+\label{fig1308}
+\end{figure}
+
+La \textit{Fig.} \ref{fig1308} ilustra las estructuras de índice para un archivo NTFS básico. Aquí, el registro MFT del archivo incluye un atributo de datos no residente, que es una secuencia de punteros de extensión, cada uno de los cuales especifica el bloque inicial y la longitud en bloques de una extensión de datos. Debido a que las extensiones pueden contener números variables de bloques, incluso un archivo de varios gigabytes puede representarse con uno o varios punteros de extensión en un registro MFT, suponiendo que la fragmentación del sistema de archivos se mantenga bajo control.
+
+Si un archivo es pequeño, se puede usar el atributo de datos para almacenar el contenido real del archivo en su registro MFT como un atributo residente.
+
+Un registro MFT tiene un formato flexible que puede incluir un rango de diferentes atributos. Además de los atributos de datos, hay tres tipos atributos de metadatos comunes, los cuales incluyen:
+\begin{itemize}
+\item \textbf{Información estándar}. Este atributo contiene información estándar necesaria para todos los archivos. Los campos incluyen las fechas y horas de creación, modificación y último acceso al archivo, el ID del propietario y el especificador de seguridad. También se incluye un conjunto de indicadores que indican información básica como si el archivo es un archivo de sólo lectura, un archivo oculto o un archivo de sistema.
+\item \textbf{Nombre del archivo}. Este atributo contiene el nombre del archivo y el número de archivo de su directorio principal. Debido a que un archivo puede tener varios nombres (por ejemplo, si hay varios enlaces físicos al archivo), puede tener varios atributos de nombre de archivo en su registro MFT.
+\item \textbf{Lista de atributos}. Dado que los metadatos de un archivo pueden incluir un número variable de atributos de tamaño variable, los metadatos de un archivo pueden ser mayores que un único registro MFT. Cuando se produce este caso, NTFS almacena los atributos en varios registros MFT e incluye una lista de atributos en el primer registro. Cuando está presente, la lista de atributos indica qué atributos se almacenan en los registros MFT.
+\end{itemize}
+
+Un archivo puede pasar por cuatro etapas de crecimiento, dependiendo de su tamaño y fragmentación. En primer lugar, un archivo pequeño puede tener su contenido incluido en el registro MFT como un atributo de datos residentes. Segundo, más típicamente, los datos de un archivo se encuentran en un pequeño número de extensiones rastreadas por un solo atributo de datos no residente. En tercer lugar, ocasionalmente, si un archivo es grande y el sistema de archivos fragmentado, un archivo puede tener tantas extensiones que los punteros de extensión no caben en un solo registro MFT. En este caso, como un archivo puede tener múltiples atributos de datos no residentes en múltiples registros MFT, con la lista de atributos en el primer registro MFT que indica qué registros MFT rastrean los rangos de extensiones. Cuarto y finalmente, si un archivo es enorme o la fragmentación del sistema de archivos es extrema, la lista de atributos de un archivo se puede hacer no residente, permitiendo casi arbitrariamente un gran número de registros MFT.
+
+Incluso la tabla de archivos maestra, en sí, se almacena como un archivo, número de archivo 0, llamado \$MFT. Por lo tanto, tenemos que encontrar la primera entrada de la MFT para leer la MFT. Para localizar el MFT, el primer sector de un volumen NTFS incluye un puntero a la primera entrada del MFT. Almacenar el MFT en un archivo evita la necesidad de asignar estáticamente todas las entradas MFT como una matriz fija en una ubicación predeterminada. En su lugar, NTFS comienza con un MFT pequeño y crece a medida que se crean nuevos archivos y se necesitan nuevas entradas.
+
+\textbf{Heurística de localidad}.
+La mayoría de las implementaciones de NTFS usan una variación del \textit{mejor ajuste} (best fit), donde el sistema intenta colocar un archivo recientemente asignado en la región libre más pequeña que es lo suficientemente grande como para contenerla. En la variación de NTFS, en lugar de intentar mantener el mapa de bits de asignación para todo el disco en memoria, el sistema almacena en caché el estado de asignación para una región más pequeña del disco y busca primero esa región. Si el caché de mapa de bits contiene información para las áreas donde se han producido las escrituras recientemente, entonces las escrituras que ocurren juntas en el tiempo tienden a agruparse.
+
+Una característica importante de NTFS para optimizar su colocación de mejor ajuste es la interfaz {\mf SetEndOfFile()}, que permite a una aplicación especificar el tamaño esperado de un archivo en el momento de la creación. En contraste, FFS asigna bloques de archivos a medida que se escriben, sin saber cuánto crecerá el archivo.
+
+Para evitar que el archivo de tabla de archivos maestros (\$MFT) se vuelva fragmentado, NTFS reserva parte del inicio del volumen (por ejemplo, el primer 12,5\% del volumen) para la expansión MFT. NTFS no coloca bloques de archivos en el área de reserva MFT hasta que el área no reservada está llena, momento en el que reduce a la mitad el tamaño del área de reserva de MFT y continúa. A medida que el volumen continúa llenando, el NTFS continúa reduciendo a la mitad el área de reserva hasta que alcanza el punto donde el área de reserva restante está más de la mitad llena.
+
+Finalmente, los sistemas operativos de Microsoft con NTFS incluyen una utilidad de desfragmentación que toma archivos fragmentados y los reescribe en regiones contiguas de disco.
+
+
 %------------------------------------------------------------------------------------------------------------------------------------------
 %	BIBLIOGRAFÍA
 %------------------------------------------------------------------------------------------------------------------------------------------
