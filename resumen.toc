@@ -47,7 +47,7 @@
 \contentsline {section}{\numberline {4.1}Casos de uso de los Hilos}{42}{section.4.1}
 \contentsline {subsection}{\numberline {4.1.1}Cuatro razones para usar Hilos}{42}{subsection.4.1.1}
 \contentsline {section}{\numberline {4.2}Abstracci\IeC {\'o}n de Hilo}{43}{section.4.2}
-\contentsline {subsection}{\numberline {4.2.1}Ejecuci\IeC {\'o}n, Suspenci\IeC {\'o}n y Reanudaci\IeC {\'o}n de Hilos}{43}{subsection.4.2.1}
+\contentsline {subsection}{\numberline {4.2.1}Ejecuci\IeC {\'o}n, Suspensi\IeC {\'o}n y Reanudaci\IeC {\'o}n de Hilos}{43}{subsection.4.2.1}
 \contentsline {subsection}{\numberline {4.2.2}Por qu\IeC {\'e} la Velocidad Variable?}{43}{subsection.4.2.2}
 \contentsline {section}{\numberline {4.3}API de Hilo Simple}{45}{section.4.3}
 \contentsline {subsection}{\numberline {4.3.1}Paralelismo fork-join}{45}{subsection.4.3.1}

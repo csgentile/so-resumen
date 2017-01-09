@@ -495,9 +495,9 @@ Con ese contexto, ahora se describe el mecanismo de hardware y software para el 
 \subsection{Tabla vectorial de interrupción}
 Cuando se produce una interrupción \textit{trap}, a excepción del procesador o llamada al sistema, el sistema operativo debe tomar acciones diferentes dependiendo de si el evento es una excepción de división por cero, una llamada al sistema para leer el archivo, o una interrupción del temporizador. ¿Cómo sabe el procesador qué código se ejecuta?
 \begin{figure}[tbhp]
-\centerline{\includegraphics[scale=0.55]{img/fig05}}
+\centerline{\includegraphics[scale=0.55]{img/fig0204}}
 \caption{Tabla vectorial de interrupciones: se enumeran las rutinas del núcleo para manejar varias interrupciones de hardware, excepciones del procesador, y las llamadas al sistema.}
-\label{fig0}
+\label{fig0204}
 \end{figure}
 
 Como ilustra la figura, el procesador tiene un registro especial que apunta a un área de memoria del núcleo llamada la tabla vectorial de interrupciones. La tabla vectorial de interrupciones es una matriz de punteros, con cada entrada que apunta a la primera instrucción de un procedimiento controlador diferente en el núcleo. Un manejador de interrupciones es el término usado para el procedimiento llamado por el núcleo de una interrupción.
@@ -529,9 +529,9 @@ La mayoría de los núcleos de sistema operativo van un paso más allá y asigna
 La asignación de la pila del nucleo por proceso hace que sea más fácil cambiar a un nuevo proceso dentro de un manejador de interrupciones o una llamada al sistema. Por ejemplo, un controlador de interrupción de temporizador podría decidir dar el procesador a un proceso diferente. Del mismo modo, una llamada al sistema tenga que esperar a que una operación de E/S para completar; Mientras tanto, algún otro proceso debe ejecutarse. Con pilas por proceso, de suspender un proceso, almacenamos un puntero a su pila del núcleo en el bloque de control de proceso, y cambiar a la pila del nuevo proceso.
 
 \begin{figure}[tbhp]
-\centerline{\includegraphics[scale=0.55]{img/fig06}}
+\centerline{\includegraphics[scale=0.55]{img/fig0205}}
 \caption{En la mayoría de sistemas operativos, un proceso tiene dos pilas: una para ejecutar código de usuario y una para el código del kernel.}
-\label{fig06}
+\label{fig0205}
 \end{figure}
 
 La figura muestra las pilas del núcleo y de usuario para varios estados de un proceso. Cuando un proceso se ejecuta en modo usuario, su pila del núcleo está vacía. Cuando un proceso ha sido apropiado (listo pero no en funcionamiento), la pila del núcleo contendrá el estado del procesador a nivel de usuario en el momento en que el proceso de usuario se interrumpió. Cuando un proceso se encuentra dentro de una llamada al sistema espera de E/S, la pila del núcleo contiene el contexto de reanudarse cuando la E/S completa, y la pila de usuario contiene el contexto de reanudarse cuando vuelva la llamada al sistema. 
@@ -582,17 +582,17 @@ Para dar un ejemplo concreto de cómo tales "cuidadosamente elaboradas" código 
 En primer lugar, proporcionamos algunos antecedentes en la arquitectura x$86$. El $86$ está segmentado, por lo que los punteros vienen en dos partes: $(i)$ un segmento, una región de memoria tal como código, datos, o la pila, y $(ii)$ un desplazamiento dentro de ese segmento. La instrucción en curso a nivel de usuario es una combinación del segmento de código (registro \textit{CS}) más el puntero de instrucción (registro \textit{EIP}). Del mismo modo, la posición actual de la pila es la combinación de segmento de pila (\textit{ss}) y el puntero de pila dentro del segmento de pila (\textit{esp}). El nivel de privilegio actual es almacenado como los bits de orden inferior del registro \textit{CS} en lugar de en la palabra de estado del procesador (registro \textit{eflags}). El registro tiene eflags códigos de condición que se modifican como un subproducto de la ejecución de las instrucciones; los eflags registrar también tiene otros indicadores que controlan el comportamiento del procesador, como por ejemplo cuando las interrupciones están enmascarados o no.
 
 \begin{figure}[tbhp]
-\centerline{\includegraphics[scale=0.55]{img/fig07}}
+\centerline{\includegraphics[scale=0.55]{img/fig0206}}
 \caption{Estado del sistema antes de un manejador de interrupciones se invoca en la arquitectura x86. SS es el segmento de pila, ESP es el puntero de pila, CS es el segmento de código, y EIP es el contador de programa. El contador de programa y puntero de pila se refiere a lugares en el proceso de usuario, y la pila de interrupción está vacía.}
-\label{fig07}
+\label{fig0206}
 \end{figure}
 
-Cuando un proceso a nivel de usuario está en ejecución, el estado actual del procesador, pila, la tabla vectorial de interrupciones del núcleo, y la pila del núcleo se ilustra en la \textit{fig.} \ref{fig07}. Cuando se produce una \textit{trap} a excepción del procesador o llamada al sistema, el hardware ahorra cuidadosamente una pequeña cantidad del estado de rosca interrumpida, que sale del sistema como se muestra en la \textit{fig.} \ref{fig08}:
+Cuando un proceso a nivel de usuario está en ejecución, el estado actual del procesador, pila, la tabla vectorial de interrupciones del núcleo, y la pila del núcleo se ilustra en la \textit{fig.} \ref{fig0206}. Cuando se produce una \textit{trap} a excepción del procesador o llamada al sistema, el hardware ahorra cuidadosamente una pequeña cantidad del estado de rosca interrumpida, que sale del sistema como se muestra en la \textit{fig.} \ref{fig0207}:
 
 \begin{figure}[tbhp]
-\centerline{\includegraphics[scale=0.55]{img/fig08}}
+\centerline{\includegraphics[scale=0.55]{img/fig0207}}
 \caption{Estado del sistema después de que el hardware x$86$ ha saltado al manejador de interrupciones. El hardware ahorra el contexto de usuario en la pila de interrupción del núcleo y cambia el contador de programa / pila a ubicaciones en la memoria del núcleo.}
-\label{fig08}
+\label{fig0207}
 \end{figure}
 
 \begin{enumerate}
@@ -613,12 +613,12 @@ Esto inicia el software de controlador.
 El guía debe guardar primero el resto del estado del proceso interrumpido - que necesita para salvar a los otros registros antes de que los cambia! El controlador empuja el resto de los registros, incluyendo el puntero de pila actual, en la pila mediante la instrucción x$86$ \textit{PUSHAD}.
 
 \begin{figure}[tbhp]
-\centerline{\includegraphics[scale=0.55]{img/fig09}}
+\centerline{\includegraphics[scale=0.55]{img/fig0208}}
 \caption{ Estado del sistema después de que el controlador de interrupciones ha comenzado a ejecutar en la arquitectura x86. El controlador de guarda primero el estado actual de los registros del procesador, ya que puede sobrescribir ellos. Tenga en cuenta que esto ahorra el puntero de pila doble: en primer lugar, la pila de usuario puntero a continuación, el puntero de pila del núcleo.}
-\label{fig09}
+\label{fig0208}
 \end{figure}
 
-Como muestra la \textit{fig.} \ref{fig09}, en este punto la pila de interrupción del núcleo posee $(1)$ el puntero de pila, banderas de ejecución, y el contador de programa guardada por el hardware, $(2)$ un código de error o valor ficticio, y $(3)$ una copia de todos los registros generales (incluyendo el puntero de pila, pero no el puntero de instrucción o eflags registro).
+Como muestra la \textit{fig.} \ref{fig0208}, en este punto la pila de interrupción del núcleo posee $(1)$ el puntero de pila, banderas de ejecución, y el contador de programa guardada por el hardware, $(2)$ un código de error o valor ficticio, y $(3)$ una copia de todos los registros generales (incluyendo el puntero de pila, pero no el puntero de instrucción o eflags registro).
 
 Una vez que el controlador ha estado guardado de la rosca interrumpida a la pila, puede utilizar los registros de lo que le plazca, y se puede desplazar objetos adicionales en la pila. Por lo tanto, el controlador puede ahora hacer cualquier trabajo que tiene que hacer.
 
@@ -646,12 +646,12 @@ En el interior del núcleo, un procedimiento implementa cada llamada al sistema.
 Vamos a unir estos dos puntos de vista, el programa de usuario haciendo la llamada al sistema, y el núcleo implementando la misma, con un par de \textit{stubs} (talones). Un par de \textit{stubs} es un par de procedimientos que median entre dos ambientes, en este caso entre el programa de usuario y el núcleo. Los \textit{stubs} también median las llamadas de procedimiento entre los equipos en un sistema distribuido.
 
 \begin{figure}[tbhp]
-\centerline{\includegraphics[scale=0.45]{img/fig10}}
+\centerline{\includegraphics[scale=0.45]{img/fig0209}}
 \caption{Un par de \textit{stubs} media entre la llamada a nivel de usuario y la aplicación de la llamada en el núcleo. El código para la llamada al sistema es \textit{file \_ open}; otras llamadas tienen sus propios \textit{stubs}. $(1)$ El proceso de usuario realiza una llamada a procedimiento normal a un \textit{stub} vinculados con el proceso. $(2)$ El stub ejecuta la instrucción \textit{trap}. Esto transfiere el control al manejador \textit{trap} del kernel. Las copia al controlador \textit{trap} y comprueba sus argumentos y después $(3)$ llama a una rutina para hacer la operación. Una vez completada la operación, $(4)$ el código devuelve al controlador de la \textit{trap}, que copia el valor de retorno en la memoria de usuario y $(5)$ se reanuda el \textit{stub} del usuario inmediatamente después de la \textit{trap}. $(6)$ El \textit{stub} de usuario vuelve a la persona que llama a nivel de usuario.}
-\label{fig10}
+\label{fig0209}
 \end{figure}
 
-La \textit{fig.} \ref{fig10} ilustra la secuencia de pasos que intervienen en una llamada al sistema:
+La \textit{fig.} \ref{fig0209} ilustra la secuencia de pasos que intervienen en una llamada al sistema:
 \begin{enumerate}
 \item El programa de usuario llama al talón de usuario en la forma normal, ajeno al hecho de la puesta en práctica del procedimiento es, de hecho, en el núcleo.
 \item El talón de usuario rellena el código de la llamada al sistema y ejecuta la instrucción trampa.
@@ -662,20 +662,20 @@ La \textit{fig.} \ref{fig10} ilustra la secuencia de pasos que intervienen en un
 \end{enumerate}
 
 \begin{figure}[tbhp]
-\centerline{\includegraphics[scale=0.45]{img/fig11}}
+\centerline{\includegraphics[scale=0.45]{img/fig0210}}
 \caption{\textit{Stub} de la biblioteca a nivel de usuario para el sistema de archivos de llamada al sistema abierto para el procesador x$86$. \textit{SysCallOpen} es el código de la llamada al sistema específico para funcionar. \textit{TrapCode} es el índice en la tabla de vectores de interrupción x$86$ para el controlador de llamada al sistema.}
-\label{fig11}
+\label{fig0210}
 \end{figure}
 
-A continuación describimos estos pasos con más detalle. La \textit{fig} \ref{fig11} ilustra el comportamiento de la colilla a nivel de usuario para las arquitecturas x$86$. El sistema operativo proporciona una rutina de biblioteca para cada llamada al sistema que toma sus argumentos, les cambia el formato de acuerdo con la convención de llamada, y ejecuta una instrucción \textit{trap}. Cuando el núcleo devuelve, el stub devuelve el resultado proporcionado por el núcleo. Por supuesto, el programa de usuario no necesita utilizar la rutina de biblioteca -la \textit{trap} esta directamente en el núcleo; a su vez, el núcleo debe protegerse de los programas malisiosos que no formatean correctamente los argumentos.
+A continuación describimos estos pasos con más detalle. La \textit{fig} \ref{fig0210} ilustra el comportamiento de la colilla a nivel de usuario para las arquitecturas x$86$. El sistema operativo proporciona una rutina de biblioteca para cada llamada al sistema que toma sus argumentos, les cambia el formato de acuerdo con la convención de llamada, y ejecuta una instrucción \textit{trap}. Cuando el núcleo devuelve, el stub devuelve el resultado proporcionado por el núcleo. Por supuesto, el programa de usuario no necesita utilizar la rutina de biblioteca -la \textit{trap} esta directamente en el núcleo; a su vez, el núcleo debe protegerse de los programas malisiosos que no formatean correctamente los argumentos.
 
-La convención de llamada al sistema es arbitraria. En la \textit{fig} \ref{fig11}, el código pasa sus argumentos en la pila de usuario, almacenando el código de llamada del sistema en el registro $\% eax$. El valor de retorno regresa en $\% eax$, así que no hay trabajo que hacer en la vuelta.
+La convención de llamada al sistema es arbitraria. En la \textit{fig} \ref{fig0210}, el código pasa sus argumentos en la pila de usuario, almacenando el código de llamada del sistema en el registro $\% eax$. El valor de retorno regresa en $\% eax$, así que no hay trabajo que hacer en la vuelta.
 
 La instrucción \textit{int} ahorra el contador de programa, puntero de pila, y \textit{eflags} en la pila del núcleo antes de saltar al controlador de llamada al sistema a través de la tabla vectorial de interrupción. El controlador del núcleo guarda todos los registros adicionales que deben ser preservados después de las llamadas a funciones. A continuación, examina el código entero de la  llamada al sistema en $\% eax$, verifica que se trata de un código de operación legal, y llama al código auxiliar correcto para esa llamada al sistema.
 
 El \textit{stub} del núcleo tiene cuatro tareas:
 \begin{itemize}
-\item \textbf{Localiza argumentos de llamada del sistema.} A diferencia de un procedimiento normal del núcleo, los argumentos a una llamada de sistema se almacenan en la memoria de usuario, por lo general en la pila de usuario. Por supuesto, el puntero de pila de usuario puede estar dañado. Incluso si es válido, se trata de una dirección virtual, no una física. Si la llamada al sistema tiene un argumento de puntero (por ejemplo, un nombre de archivo), el \textit{stub} debe comprobar la dirección para verificar que es un domicilio legal dentro del dominio de usuario. Si es así, el \textit{stub} de la convierte a una dirección física de manera que el núcleo puede utilizar con seguridad. En la \textit{fig.} \ref{fig11} , el puntero a la cadena que representa el nombre del archivo se almacena en la pila; Por lo tanto, el talón debe revisar y traducir tanto la dirección de pila y el
+\item \textbf{Localiza argumentos de llamada del sistema.} A diferencia de un procedimiento normal del núcleo, los argumentos a una llamada de sistema se almacenan en la memoria de usuario, por lo general en la pila de usuario. Por supuesto, el puntero de pila de usuario puede estar dañado. Incluso si es válido, se trata de una dirección virtual, no una física. Si la llamada al sistema tiene un argumento de puntero (por ejemplo, un nombre de archivo), el \textit{stub} debe comprobar la dirección para verificar que es un domicilio legal dentro del dominio de usuario. Si es así, el \textit{stub} de la convierte a una dirección física de manera que el núcleo puede utilizar con seguridad. En la \textit{fig.} \ref{fig0210} , el puntero a la cadena que representa el nombre del archivo se almacena en la pila; Por lo tanto, el talón debe revisar y traducir tanto la dirección de pila y el
 puntero de cadena.
 \item \textbf{Validar los parámetros.} El núcleo también debe protegerse contra los errores accidentales o maliciosos en el formato o el contenido de sus argumentos. Un nombre de archivo es típicamente una cadena terminada en cero, pero el núcleo no se puede confiar en el código de usuario trabaje siempre correctamente. El nombre de archivo puede estar dañado; se puede señalar a la memoria fuera de la región de la solicitud; puede comenzar dentro de la región de memoria de la aplicación sino que se extienden más allá de ella; la aplicación puede no tener permiso para acceder al archivo; puede no existir el archivo; Etcétera. Si se detecta un error, el núcleo devuelve al programa de usuario; de otro modo, el núcleo realiza la operación en nombre de la aplicación.
 
@@ -738,12 +738,12 @@ En primer lugar, tenemos que responder "qué" - ¿qué funciones qué necesitamo
 En este capítulo, nos centramos en sólo los dos primeros de estos temas: gestión de procesos y de entrada / salida. Podemos describir una interfaz funcional para la gestión de procesos y de entrada / salida con sólo una docena de llamadas al sistema, y el resto de la interfaz de llamada al sistema con otra docena. Más sorprendente aún, estas llamadas son casi sin cambios respecto al diseño original de UNIX. A pesar de estar diseñado e implementado en la década de 1970 en primer lugar, la mayoría de estas llamadas se encuentran todavía en amplio uso en los sistemas de hoy.
 
 \begin{figure}[tbhp]
-\centerline{\includegraphics[scale=0.45]{img/fig12}}
+\centerline{\includegraphics[scale=0.45]{img/fig0301}}
 \caption{La funcionalidad del sistema operativo puede ser implementada en programas a nivel de usuario, en las bibliotecas a nivel de usuario, en el propio núcleo, o en un servidor de nivel de usuario invocado por el núcleo.}
-\label{fig12}
+\label{fig0301}
 \end{figure}
 
-En segundo lugar, tenemos que responder "donde" - para cualquier bit de funcionalidad del sistema operativo que proporciona a los programas de usuario, tenemos varias opciones para decidir donde vive, se ilustra en la \textit{fit.} \ref{fig12}:
+En segundo lugar, tenemos que responder "donde" - para cualquier bit de funcionalidad del sistema operativo que proporciona a los programas de usuario, tenemos varias opciones para decidir donde vive, se ilustra en la \textit{fit.} \ref{fig0301}:
 
 \begin{itemize}
 \item \textbf{Podemos poner la funcionalidad en un programa a nivel de usuario.} En Windows y UNIX, por ejemplo, hay un programa de usuario para la gestión de inicio de sesión de un usuario y otro para la gestión de los procesos de un usuario.
@@ -793,11 +793,11 @@ Nosotros llamamos al creador de procesos ''proceso padre'' y a los creados, ''pr
 Por desgracia, hay un buen número de aspectos del proceso padre que pueda querer controlar, tales como: sus privilegios, donde envía su entrada y salida, lo que debería almacenar en sus archivos, lo que usa como prioridad de planificación, y demas. No podemos confiar en el proceso hijo para establecer sus propios privilegios y prioridad, y sería un inconveniente esperar cada solicitud de inclusión de código para averiguar su contexto. Por lo tanto la interfaz real para \textit{CreateProcess} es un poco más complicada en la práctica.
 
 \subsection{Gestión de Procesos de UNIX}
-UNIX tiene un enfoque diferente para el manejo de procesos, que es complejo en la teoría y simple en la práctica. UNIX divide en dos etapas a CreateProcess, llamadas \textit{fork} y \textit{exec}, que se ilustra en la \textit{fig.} \ref{fig13}:
+UNIX tiene un enfoque diferente para el manejo de procesos, que es complejo en la teoría y simple en la práctica. UNIX divide en dos etapas a CreateProcess, llamadas \textit{fork} y \textit{exec}, que se ilustra en la \textit{fig.} \ref{fig0302}:
 \begin{figure}[tbhp]
-\centerline{\includegraphics[scale=0.45]{img/fig13}}
+\centerline{\includegraphics[scale=0.45]{img/fig0302}}
 \caption{El funcionamiento de las llamadas \textit{fork()} y \textit{exec()}. \textit{fork()} hace una copia del proceso padre; UNIX \textit{exec()} cambia el proceso hijo para ejecutar el nuevo programa.}
-\label{fig13}
+\label{fig0302}
 \end{figure}
 
 UNIX \textit{fork} crea una copia completa del proceso padre, con una excepción clave. (Necesitamos una manera de distinguir entre el padre y la copia del mismo, el hijo.) El proceso hijo establece privilegios, prioridades, y E/S para el programa que está a punto de comenzar, por ejemplo, mediante el cierre de algunos archivos, la apertura de los demás, lo que reduce su prioridad si se va a ejecutar en segundo plano, etc. Debido a que el hijo corre exactamente el mismo código que el padre, se puede confiar en que va a establecer el contexto para el nuevo programa correctamente.
@@ -848,12 +848,12 @@ Esto ha llevado a los diseñadores del sistema operativo a luchar con un comprom
 
 \subsection{Núcleos monolíticos}
 \begin{figure}[tbhp]
-\centerline{\includegraphics[scale=0.45]{img/fig14}}
+\centerline{\includegraphics[scale=0.45]{img/fig0303}}
 \caption{En un núcleo de sistema operativo monolítico, la mayor parte de la funcionalidad del sistema operativo está relacionado entre sí dentro del núcleo. Los módulos del kernel llaman directamente a otros módulos del kernel para realizar las funciones necesarias. Por ejemplo, el sistema de memoria virtual utiliza gestión de memoria intermedia, la sincronización, y la capa de abstracción de hardware.}
-\label{fig14}
+\label{fig0303}
 \end{figure}
 
-Casi todos sistemas operativos comerciales ampliamente utilizados, como Windows, MacOS y Linux, pueden adoptar un enfoque similar a la arquitectura del núcleo - un diseño monolítico. Como se muestra en la \textit{fig.} \ref{fig14}, con un núcleo monolítico, la mayor parte de la funcionalidad del sistema operativo funciona en el interior del núcleo del sistema operativo. En verdad, el término es un nombre poco apropiado, porque incluso en los llamados sistemas monolíticos, a menudo hay grandes segmentos de lo que los usuarios consideran que el sistema operativo se ejecuta fuera del núcleo, ya sea como empresas de servicios públicos como la shell, o en las bibliotecas del sistema, tales como bibliotecas para gestionar la interfaz de usuario.
+Casi todos sistemas operativos comerciales ampliamente utilizados, como Windows, MacOS y Linux, pueden adoptar un enfoque similar a la arquitectura del núcleo - un diseño monolítico. Como se muestra en la \textit{fig.} \ref{fig0303}, con un núcleo monolítico, la mayor parte de la funcionalidad del sistema operativo funciona en el interior del núcleo del sistema operativo. En verdad, el término es un nombre poco apropiado, porque incluso en los llamados sistemas monolíticos, a menudo hay grandes segmentos de lo que los usuarios consideran que el sistema operativo se ejecuta fuera del núcleo, ya sea como empresas de servicios públicos como la shell, o en las bibliotecas del sistema, tales como bibliotecas para gestionar la interfaz de usuario.
 
 Interno a un núcleo monolítico, el diseñador del sistema operativo es libre de desarrollar cualesquiera que sean las interfaces entre los módulos que tienen sentido, y por lo que hay un poco de variación de un sistema operativo a otro en esas estructuras internas. Sin embargo, dos temas comunes en todos los sistemas son: para mejorar la portabilidad, casi todos los sistemas operativos modernos tienen tanto una capa de abstracción de hardware y controladores de dispositivos de carga dinámica.
 
@@ -957,30 +957,30 @@ Hasta el momento, hemos descrito lo que un hilo es y por qué es útil. Antes de
 \item \textbf{Tarea okanificable por separado.} El sistema operativo se puede ejecutar, suspender o reanudar un hilo en cualquier momento.
 \end{itemize}
 
-\subsection{Ejecución, Suspención y Reanudación de Hilos}
+\subsection{Ejecución, Suspensión y Reanudación de Hilos}
 Los hilos proporcionan la ilusión de un número infinito de procesadores. ¿Cómo hace el sistema operativo para implementar esta ilusión? Debe ejecutar las instrucciones de cada hilo de manera que cada hilo progrese, pero el hardware subyacente tiene sólo un número limitado de los procesadores, y quizás único.
 
 Para asignar a un conjunto arbitrario de hilos a un conjunto fijo de procesadores, los sistemas operativos incluyen un programador de subprocesos que puede cambiar entre los hilos que se están ejecutando y las que están listos pero no en ejecución.
 
-El cambio entre hilos es transparente para el código que está siendo ejecutado dentro de cada hilo. La abstracción hace que cada hilo parece ser un único flujo de ejecución; esto significa que el programador puede prestar atención a la secuencia de la instrucción dentro o fuera de un hilo o cuando esa secuencia puede ser (temporalmente) suspendido para permitir la ejecucuión de otro hilo.
+El cambio entre hilos es transparente para el código que está siendo ejecutado dentro de cada hilo. La abstracción hace que cada hilo parece ser un único flujo de ejecución; esto significa que el programador puede prestar atención a la secuencia de la instrucción dentro o fuera de un hilo o cuando esa secuencia puede ser (temporalmente) suspendido para permitir la ejecución de otro hilo.
 
 Por lo tanto, los hilos proporcionan un modelo de ejecución en el que cada hilo se ejecuta en un procesador virtual dedicado a una velocidad impredecible y variable. Desde el punto de vista del código de un hilo, cada instrucción aparece para ejecutar inmediatamente después de la anterior. Sin embargo, el planificador puede suspender a un hilo entre una instrucción y el siguiente y volver a correr más tarde. Es como si el hilo se ejecuta en un procesador que a veces se vuelve muy lento.
 
 \begin{figure}[tbhp]
-\centerline{\includegraphics[scale=0.45]{img/fig15}}
+\centerline{\includegraphics[scale=0.45]{img/fig0401}}
 \caption{Tres posibles formas en que un hilo puede ejecutar, todos los cuales son equivalentes al programador.}
-\label{fig15}
+\label{fig0401}
 \end{figure}
 
-La \textit{fig.} \ref{fig15} ilustra la vista del programador de un programa sencillo y tres (de muchas) maneras posibles de cómo el programa puede ser ejecutado, dependiendo de lo que haga el planificador. Desde el punto de vista del hilo, o de la velocidad de ejecución, las alternativas son equivalentes. De hecho, el hilo típicamente no es consciente de cuál de estos (u otros) se produce en realidad durante la ejecución.
+La \textit{fig.} \ref{fig0401} ilustra la vista del programador de un programa sencillo y tres (de muchas) maneras posibles de cómo el programa puede ser ejecutado, dependiendo de lo que haga el planificador. Desde el punto de vista del hilo, o de la velocidad de ejecución, las alternativas son equivalentes. De hecho, el hilo típicamente no es consciente de cuál de estos (u otros) se produce en realidad durante la ejecución.
 
 \begin{figure}[tbhp]
-\centerline{\includegraphics[scale=0.45]{img/fig16}}
+\centerline{\includegraphics[scale=0.45]{img/fig0402}}
 \caption{Algunas de las muchas maneras posibles que podrían ser tres hilos intercalados en tiempo de ejecución.}
-\label{fig16}
+\label{fig0402}
 \end{figure}
 
-¿Cómo se programan los hilos afecta a la intercalación de un hilo con otros hilos. La \textit{fug.} \ref{fig16} muestra algunas de las muchas posibles intercalaciones de un programa con tres hilos. El programador de hilos, por tanto, no debe hacer ninguna suposición sobre la velocidad relativa con la que ejecutan diferentes hilos.
+¿Cómo se programan los hilos afecta a la intercalación de un hilo con otros hilos. La \textit{fug.} \ref{fig0402} muestra algunas de las muchas posibles intercalaciones de un programa con tres hilos. El programador de hilos, por tanto, no debe hacer ninguna suposición sobre la velocidad relativa con la que ejecutan diferentes hilos.
 
 \subsection{Por qué la Velocidad Variable?}
 Puede parecer extraño requerir a los programadores suponer que el procesador virtual de un hilo corre a una velocidad impredecible y que cualquier intercalación con otros hilos es posible. Sin duda, el programador debe ser capaz de aprovechar el hecho de que algunos intercalados son más propensos que otros?
@@ -1039,11 +1039,11 @@ ADVERTENCIA: Aunque existe una división lógica importante entre el estado por 
 Para evitar comportamientos inesperados, es importante a la hora de escribir programas multihilo saber qué variables están diseñados para ser compartidas a través de hilos (variables globales, los objetos en la pila) y que están diseñados para ser (variables locales/automáticos) privadas.
 
 \section{Ciclo de Vida de un Hilo}
-Es útil tener en cuenta la progresión de estados de como un hilo pasa de ser creado, de ser programado y desprogramado de entrada y salida de un procesador, y luego a la salida. La \textit{fig.} \ref{fig17} muestra los estados de un hilo durante su vida útil.
+Es útil tener en cuenta la progresión de estados de como un hilo pasa de ser creado, de ser programado y desprogramado de entrada y salida de un procesador, y luego a la salida. La \textit{fig.} \ref{fig0403} muestra los estados de un hilo durante su vida útil.
 \begin{figure}[tbhp]
-\centerline{\includegraphics[scale=0.45]{img/fig17}}
+\centerline{\includegraphics[scale=0.45]{img/fig0403}}
 \caption{Los estados de un hilo durante su vida útil.}
-\label{fig17}
+\label{fig0403}
 \end{figure}
 
 \textbf{INIT (Inicio).} La creación del hilo pone un hilo en su estado INIT y asigna e inicializa las estructuras de datos por subproceso. Una vez hecho esto, el código de la creación del hilo pone al hilo en el estado READY mediante la adición del hilo a la READY LIST. Esta lista es el conjunto de hilos ejecutables que están esperando su turno para utilizar un procesador. En la práctica, la READY LIST no es en realidad una \textit{lista}; el sistema operativo utiliza típicamente una estructura de datos más sofisticado para realizar un seguimiento de hilos ejecutables, tales como una cola de prioridad. Sin embargo, después de la convención, vamos a seguir para referirse a ella como la lista preparada.
