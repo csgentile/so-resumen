@@ -1,0 +1,102 @@
+\select@language {spanish}
+\contentsline {chapter}{\numberline {1}Introducci\IeC {\'o}n}{5}{chapter.1}
+\contentsline {section}{\numberline {1.1}\IeC {\textquestiondown }Qu\IeC {\'e} es un Sistema Operativo?}{5}{section.1.1}
+\contentsline {subsection}{\numberline {1.1.1}Recursos compartidos: el Sistema Operativo como \IeC {\'A}rbitro}{6}{subsection.1.1.1}
+\contentsline {subsection}{\numberline {1.1.2}Limitaciones del enmascaramiento: el Sistema Operativo como Ilusionista}{7}{subsection.1.1.2}
+\contentsline {subsection}{\numberline {1.1.3}Proporcionando servicios en com\IeC {\'u}n: el Sistema Operativo como Pegamento}{7}{subsection.1.1.3}
+\contentsline {section}{\numberline {1.2}Evaluaci\IeC {\'o}n del Sistema Operativo}{7}{section.1.2}
+\contentsline {subsection}{\numberline {1.2.1}Confiabilidad y Disponibilidad}{7}{subsection.1.2.1}
+\contentsline {subsection}{\numberline {1.2.2}Seguridad}{8}{subsection.1.2.2}
+\contentsline {subsection}{\numberline {1.2.3}Portabilidad}{8}{subsection.1.2.3}
+\contentsline {subsection}{\numberline {1.2.4}Rendimiento}{9}{subsection.1.2.4}
+\contentsline {subsection}{\numberline {1.2.5}Adopci\IeC {\'o}n}{10}{subsection.1.2.5}
+\contentsline {subsection}{\numberline {1.2.6}Compromisos de Dise\IeC {\~n}o}{10}{subsection.1.2.6}
+\contentsline {section}{\numberline {1.3}Sistemas Operativos: Pasado, Presente y Futuro}{10}{section.1.3}
+\contentsline {subsection}{\numberline {1.3.1}Impacto de las tendencias tecnol\IeC {\'o}gicas}{10}{subsection.1.3.1}
+\contentsline {subsection}{\numberline {1.3.2}Primeros Sistemas Operativos}{11}{subsection.1.3.2}
+\contentsline {subsection}{\numberline {1.3.3}Sistemas Operativos Multi-Usuario}{11}{subsection.1.3.3}
+\contentsline {subsection}{\numberline {1.3.4}Sistemas Operativos de Tiempo Compartido}{11}{subsection.1.3.4}
+\contentsline {subsection}{\numberline {1.3.5}Sistemas Operativos Modernos}{12}{subsection.1.3.5}
+\contentsline {subsection}{\numberline {1.3.6}Sistemas Operativos Futuros}{13}{subsection.1.3.6}
+\contentsline {chapter}{\numberline {2}La Abstracci\IeC {\'o}n del Kernel}{15}{chapter.2}
+\contentsline {section}{\numberline {2.1}La Abstracci\IeC {\'o}n del Proceso}{15}{section.2.1}
+\contentsline {section}{\numberline {2.2}El Modo Dual de Operaci\IeC {\'o}n}{16}{section.2.2}
+\contentsline {subsection}{\numberline {2.2.1}Instrucciones Privilegiadas}{18}{subsection.2.2.1}
+\contentsline {subsection}{\numberline {2.2.2}Protecci\IeC {\'o}n de Memoria}{18}{subsection.2.2.2}
+\contentsline {subsection}{\numberline {2.2.3}Interrupciones del Temporizador}{19}{subsection.2.2.3}
+\contentsline {section}{\numberline {2.3}Tipos de Modo de Transferencia}{20}{section.2.3}
+\contentsline {subsection}{\numberline {2.3.1}Del modo Usuario al modo Kernel}{20}{subsection.2.3.1}
+\contentsline {subsection}{\numberline {2.3.2}Del modo Kernel al modo Usuario}{21}{subsection.2.3.2}
+\contentsline {section}{\numberline {2.4}Implementaci\IeC {\'o}n de la Transferencia en Modo Seguro}{22}{section.2.4}
+\contentsline {subsection}{\numberline {2.4.1}Tabla vectorial de interrupci\IeC {\'o}n}{22}{subsection.2.4.1}
+\contentsline {subsection}{\numberline {2.4.2}Pila de Interrupciones}{23}{subsection.2.4.2}
+\contentsline {subsection}{\numberline {2.4.3}Dos Pilas por Proceso}{24}{subsection.2.4.3}
+\contentsline {subsection}{\numberline {2.4.4}El enmascaramiento de interrupciones}{25}{subsection.2.4.4}
+\contentsline {subsection}{\numberline {2.4.5}Soporte de Hardware para el Ahorro y Restauraci\IeC {\'o}n de Registros}{25}{subsection.2.4.5}
+\contentsline {section}{\numberline {2.5}Poniendo todo junto: Modo de Transferencia x86}{25}{section.2.5}
+\contentsline {section}{\numberline {2.6}Inicio de un nuevo proceso}{29}{section.2.6}
+\contentsline {chapter}{\numberline {3}La interfaz de programaci\IeC {\'o}n}{31}{chapter.3}
+\contentsline {section}{\numberline {3.1}Gesti\IeC {\'o}n de Procesos}{32}{section.3.1}
+\contentsline {subsection}{\numberline {3.1.1}Gesti\IeC {\'o}n de Procesos de Windows}{32}{subsection.3.1.1}
+\contentsline {subsection}{\numberline {3.1.2}Gesti\IeC {\'o}n de Procesos de UNIX}{33}{subsection.3.1.2}
+\contentsline {section}{\numberline {3.2}Estructura del Sistema Operativo}{34}{section.3.2}
+\contentsline {subsection}{\numberline {3.2.1}N\IeC {\'u}cleos monol\IeC {\'\i }ticos}{35}{subsection.3.2.1}
+\contentsline {subsection}{\numberline {3.2.2}MicroKernels}{36}{subsection.3.2.2}
+\contentsline {chapter}{\numberline {4}Concurrencia e Hilos}{39}{chapter.4}
+\contentsline {section}{\numberline {4.1}Casos de uso de los Hilos}{40}{section.4.1}
+\contentsline {subsection}{\numberline {4.1.1}Cuatro razones para usar Hilos}{40}{subsection.4.1.1}
+\contentsline {section}{\numberline {4.2}La abstracci\IeC {\'o}n Hilo}{41}{section.4.2}
+\contentsline {subsection}{\numberline {4.2.1}Ejecuci\IeC {\'o}n, Suspensi\IeC {\'o}n y Reanudaci\IeC {\'o}n de Hilos}{41}{subsection.4.2.1}
+\contentsline {subsection}{\numberline {4.2.2}Por qu\IeC {\'e} la Velocidad Variable?}{41}{subsection.4.2.2}
+\contentsline {section}{\numberline {4.3}API de Hilos Simples}{42}{section.4.3}
+\contentsline {subsection}{\numberline {4.3.1}Paralelismo fork-join}{43}{subsection.4.3.1}
+\contentsline {section}{\numberline {4.4}Estructura de Datos y Ciclo de Vida de un Hilo}{43}{section.4.4}
+\contentsline {subsection}{\numberline {4.4.1}Bloque de Control de un Hilo y sus Estados - TCB}{43}{subsection.4.4.1}
+\contentsline {subsection}{\numberline {4.4.2}Estados Compartidos}{44}{subsection.4.4.2}
+\contentsline {section}{\numberline {4.5}Ciclo de Vida de un Hilo}{44}{section.4.5}
+\contentsline {section}{\numberline {4.6}Implementacion de Hilos en el Kernel}{45}{section.4.6}
+\contentsline {subsection}{\numberline {4.6.1}Creaci\IeC {\'o}n de un Hilo}{45}{subsection.4.6.1}
+\contentsline {subsection}{\numberline {4.6.2}Eliminaci\IeC {\'o}n de un Hilo}{46}{subsection.4.6.2}
+\contentsline {subsection}{\numberline {4.6.3}Cambio de contexto para un hilo}{46}{subsection.4.6.3}
+\contentsline {section}{\numberline {4.7}Combinando hilos del N\IeC {\'u}cleo y un \IeC {\'u}nico subproceso de Usuario}{47}{section.4.7}
+\contentsline {section}{\numberline {4.8}Implementaci\IeC {\'o}n de Procesos Multihilo}{48}{section.4.8}
+\contentsline {subsection}{\numberline {4.8.1}Implementaci\IeC {\'o}n de procesos multihilo que hacen uso de los hilos del kernel}{48}{subsection.4.8.1}
+\contentsline {subsection}{\numberline {4.8.2}La Aplicaci\IeC {\'o}n de Hilos a Nivel de Usuario - Sin Soporte del N\IeC {\'u}cleo}{49}{subsection.4.8.2}
+\contentsline {subsection}{\numberline {4.8.3}Implementaci\IeC {\'o}n de Hilos a Nivel de Usuario - Con Soporte del N\IeC {\'u}cleo}{50}{subsection.4.8.3}
+\contentsline {chapter}{\numberline {5}Sincronizaci\IeC {\'o}n de acceso a los objetos compartidos}{53}{chapter.5}
+\contentsline {section}{\numberline {5.1}Challenges - Desaf\IeC {\'\i }os}{54}{section.5.1}
+\contentsline {subsection}{\numberline {5.1.1}Condiciones de Carrera}{54}{subsection.5.1.1}
+\contentsline {subsection}{\numberline {5.1.2}Operaciones At\IeC {\'o}micas}{54}{subsection.5.1.2}
+\contentsline {subsection}{\numberline {5.1.3}Too Much Milk - Demasiada Leche}{55}{subsection.5.1.3}
+\contentsline {subsection}{\numberline {5.1.4}Discusi\IeC {\'o}n}{56}{subsection.5.1.4}
+\contentsline {section}{\numberline {5.2}La estructura de los objetos compartidos}{56}{section.5.2}
+\contentsline {subsection}{\numberline {5.2.1}La implementaci\IeC {\'o}n de objetos compartidos}{57}{subsection.5.2.1}
+\contentsline {subsection}{\numberline {5.2.2}Alcance y Hoja de Ruta}{58}{subsection.5.2.2}
+\contentsline {section}{\numberline {5.3}Locks (Bloqueos): Exclusi\IeC {\'o}n Mutua}{58}{section.5.3}
+\contentsline {subsection}{\numberline {5.3.1}Cerrojos: API y Propiedades}{58}{subsection.5.3.1}
+\contentsline {subsection}{\numberline {5.3.2}Sem\IeC {\'a}foros}{59}{subsection.5.3.2}
+\contentsline {chapter}{\numberline {7}Scheduling - Planificaci\IeC {\'o}n}{61}{chapter.7}
+\contentsline {section}{\numberline {7.1}Planificaci\IeC {\'o}n de un solo Procesador}{62}{section.7.1}
+\contentsline {subsection}{\numberline {7.1.1}Primero en entrar, primero en salir (FIFO)}{62}{subsection.7.1.1}
+\contentsline {subsection}{\numberline {7.1.2}El trabajo m\IeC {\'a}s corto primero (SJF)}{63}{subsection.7.1.2}
+\contentsline {subsection}{\numberline {7.1.3}Round Robin}{63}{subsection.7.1.3}
+\contentsline {subsection}{\numberline {7.1.4}Max-Min Fairness - Equidad m\IeC {\'a}xima-m\IeC {\'\i }nima}{65}{subsection.7.1.4}
+\contentsline {subsection}{\numberline {7.1.5}Caso de Estudio: Multi-Level Feedback (Retroalimentaci\IeC {\'o}n Multinivel)}{66}{subsection.7.1.5}
+\contentsline {subsection}{\numberline {7.1.6}Resumen}{67}{subsection.7.1.6}
+\contentsline {chapter}{\numberline {8}Traducci\IeC {\'o}n de Direcciones}{69}{chapter.8}
+\contentsline {section}{\numberline {8.1}Concepto de Traducci\IeC {\'o}n de Direcciones}{69}{section.8.1}
+\contentsline {section}{\numberline {8.2}Hacia una traducci\IeC {\'o}n flexible de direcciones}{71}{section.8.2}
+\contentsline {subsection}{\numberline {8.2.1}Segmentaci\IeC {\'o}n de Memoria}{71}{subsection.8.2.1}
+\contentsline {subsection}{\numberline {8.2.2}Paginaci\IeC {\'o}n de Memoria}{72}{subsection.8.2.2}
+\contentsline {subsection}{\numberline {8.2.3}Traducci\IeC {\'o}n de varios niveles}{73}{subsection.8.2.3}
+\contentsline {subsection}{\numberline {8.2.4}Portabilidad}{75}{subsection.8.2.4}
+\contentsline {chapter}{\numberline {11}Sistema de Archivos: Introducci\IeC {\'o}n y Visi\IeC {\'o}n General}{77}{chapter.11}
+\contentsline {section}{\numberline {11.1}La abstracci\IeC {\'o}n del sistema de archivos}{78}{section.11.1}
+\contentsline {section}{\numberline {11.2}API}{80}{section.11.2}
+\contentsline {chapter}{\numberline {13}Archivos y directorios}{83}{chapter.13}
+\contentsline {section}{\numberline {13.1}Vistazo de la implementaci\IeC {\'o}n}{83}{section.13.1}
+\contentsline {section}{\numberline {13.2}Directorios: nombres de datos}{84}{section.13.2}
+\contentsline {section}{\numberline {13.3}Archivos: B\IeC {\'u}squeda de datos}{86}{section.13.3}
+\contentsline {subsection}{\numberline {13.3.1}FAT: Lista enlazada}{86}{subsection.13.3.1}
+\contentsline {subsection}{\numberline {13.3.2}FFS: \IeC {\'A}rbol fijo}{88}{subsection.13.3.2}
+\contentsline {subsection}{\numberline {13.3.3}NTFS: \IeC {\'a}rbol flexible con extensiones}{92}{subsection.13.3.3}
