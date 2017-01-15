@@ -1,7 +1,7 @@
 %\documentclass[conference,a4paper,10pt,oneside,final]{tp}
 \documentclass[10pt]{book}
-\usepackage[utf8]{inputenc}   						% caracteres especiales (acentos, eñes)
-\usepackage{mylatex} % mi paquete de características LaTeX
+\usepackage[utf8]{inputenc}   	% caracteres especiales (acentos, eñes)
+\usepackage{mylatex} 			% mi paquete de características LaTeX
 
   
 %------------------------------------------------------------------------------------------------------------------------------------------
@@ -1178,138 +1178,212 @@ Podemos modelar cada compañero de habitación como un hilo y el número de bote
 \item Liveness (Vitalidad): Si se necesita la leche, alguien finalmente la compra.
 \end{itemize}
 
-\textbf{Solución $1$.} La idea básica es que un compañero de habitación deje una nota en la heladera antes de ir a la tienda. La forma más sencilla de dejar esta nota -- dado nuestro modelo de programación que hemos compartido memoria en el que podemos realizar cargas y almacenamientos atómicos -- es fijar una bandera (\textit{flag}) cuando va a comprar leche y comprobar este indicador antes de ir a comprar leche.
+\textbf{ADVERTENCIA: Simplificación de suposiciones}. A lo largo del análisis de esta sección, asumimos que las instrucciones se ejecutan exactamente en el orden escrito, es decir, ni el compilador ni la arquitectura reordenan las instrucciones. Esta suposición es crucial para razonar sobre el orden de las operaciones atómicas de carga y almacenamiento, pero muchos compiladores y arquitecturas modernas la violan.
 
-Desafortunadamente, esta implementación puede violar la seguridad. Por ejemplo, el primer hilo podría ejecutar todo incluyendo la verificación del valor de cantidad de leche y luego el contexto cambiar. A continuación, el segundo hilo correr todo este código y comprar leche. Por último, el primer hilo podría ser re-planificado, ver la nota en cero, poner la nota en uno, comprar más leche, y eliminar la nota, dejando el sistema con $leche == 2$.
-
-Esta ``solución'' empeora el problema. Si bien por lo general funciona, puede fallar de vez en cuando el planificador hace justo lo correcto (o incorrecto). Hemos creado un \textit{Heisenbug} que hace que el programa falle ocasionalmente en formas que pueden ser muy difíciles de reproducir.
-
-\textbf{Solución 2.} En la solución 1, el compañero de habitación comprueba la nota antes de ajustarla. Esto abre la posibilidad de que un compañero ya ha tomado la decisión de comprar la leche antes de notificar a la otro compañero de cuarto de esa decisión. Si utilizamos dos variables para las notas, un compañero puede crear una nota antes de comprobar la otra nota y tomar la decisión de comprar.
-
-Si el primer hilo ejecuta la ruta de un código y el segundo hilo ejecuta el código, este protocolo es seguro; haciendo que cada hilo de escribir una nota (''yo podría comprar leche'') antes de decidirse a comprar leche, aseguramos la seguridad de la propiedad: a lo sumo un hilo compra leche.
-
-Aunque esta intuición es sólida, lo que demuestra la propiedad de seguridad sin enumerar todas las posibles intercalaciones que  requieren cuidado.
-
-\textbf{Safety Proof - Prueba de seguridad.} Supongamos por el bien de la contradicción que el algoritmo no es seguro - tanto A como B compran leche. Tenga en cuenta el estado de las dos variables (noteb, leche) cuando el hilo A está en la línea marcada A1, en el preciso momento cuando se produce la carga atómica de noteb de la memoria compartida para el registro de una. Hay tres casos a considerar:
-\begin{itemize}
-\item Caso 1: (noteB $= 1$, la leche = cualquier valor). Este estado contradice la suposición de que el hilo Una compra leche y llega a A3.
-\item Caso 2: (noteb $= 0$, leche $> 0$). En este sencillo programa, la leche de la propiedad $> 0$ es una característica estable - una vez que se convierte en realidad, sigue siendo cierto para siempre. Por lo tanto, si la leche $> 0$ es cierto cuando A está en A1, la prueba de A en la línea A2 fallará, y A no va a comprar la leche, lo que contradice nuestra suposición.
-\item Caso 3: (noteb $= 0$, leche $= 0$). Sabemos que el hilo B debe actualmente no se encuentre ejecutando cualquiera de las líneas marcadas B1-B5. También sabemos que, o bien NotaA $== 1$ o leche $> 0$ serán verdaderas de ahora en adelante (Notaa o leche es también una característica estable). Esto significa que B no puede comprar la leche en el futuro (ya sea en la prueba B1 o B2 debe fallar), lo que contradice nuestra suposición de que tanto A como B comprar leche.
-\end{itemize}
-
-Puesto que cada caso contradice la suposición, el algoritmo es seguro.
-
-\textbf{Liveness - Vida de la conexión.} Por desgracia, la solución 2 no asegura la vida de la conexión. En particular, es posible que ambos hilos para establecer sus respectivas notas, para cada hilo para comprobar la nota del otro hilo, y por tanto de las discusiones para decidir no comprar leche. Esto nos lleva a la Solución 3.
-
-\textbf{Solución 3.} La solución $2$ era seguro porque un hilo podría evitar la compra de leche si había alguna posibilidad de que el otro hilo podría comprar leche. Para la solución $3$, nos aseguramos de que al menos uno de los hilos determina si el otro hilo ha comprado la leche o no antes de decidir si comprar o no. En particular, hacemos lo siguiente:
-
-Podemos demostrar que la solución $3$ es seguro usar un argumento similar al que se utilizó para la solución $2$. Para demostrar que la solución $3$ es en vivo, observar que ruta de código B no tiene bucles, por lo que finalmente el hilo B debe terminar de ejecutar el código en la lista. Con el tiempo, noteB $== 0$ se convierte en verdadera y sigue siendo cierto. Por lo tanto, el subproceso A debe finalmente llegar a la línea M y decidir si comprar la leche. Si encuentra $M == 1$, a continuación, la leche ha sido comprado. Si encuentra $M == 0$, entonces se va a comprar leche. De cualquier manera, la propiedad liveness - que, si es necesario, un poco de leche se compra - se cumple.
-
-\subsection{Discusión}
-Suponiendo que el compilador y el procesador ejecutan instrucciones en el orden del programa, la prueba anterior muestra que es posible idear una solución a demasiada leche que es a la vez Safety y Liveness usando nada más que las operaciones de carga y almacenamiento atómicas en la memoria compartida. Aunque la solución que presentamos sólo funciona para los dos compañeros, no es una generalización, llamado algoritmo de Peterson, que funciona con cualquier número fijo de $n$ hilos. Sin embargo, nuestra solución para demasiada leche (y así mismo algoritmo de Peterson) no es terriblemente satisfactorio:
-\begin{itemize}
-\item La solución es compleja y requiere un cuidadoso razonamiento para estar convencidos de que funciona.
-\item La solución es ineficiente. En demasiada leche, mientras que el hilo A está a la espera, es una espera-ocupada que consumen recursos de la CPU. En solución generalizada de Peterson, todas las discusiones pueden n-ocupados esperar. Ls espera es especialmente problemática en los sistemas modernos con derecho preferente de subprocesos múltiples, como el hilo hilado puede estar reteniendo el procesador espera de un evento que no puede ocurrir hasta que se re-programado adelantó un poco de hilo para funcionar.
-\item La solución puede fallar si el compilador o hardware reorganizan las instrucciones. Esta limitación puede abordarse mediante el uso de barreras de memoria (véase el recuadro). Adición de barreras de memoria aumentaría aún más la complejidad de la implementación del algoritmo; barreras no abordan las otras limitaciones que acabamos de mencionar.
-\end{itemize}
-
-\section{La estructura de los objetos compartidos}
-\begin{figure}[tbhp]
-\centerline{\includegraphics[scale=0.45]{img/fig0501}}
-\caption{En un programa multi-hilo, hilos están separados y operan simultáneamente en objetos compartidos. Los objetos compartidos contienen ambas variables de estado y sincronización compartidos, que se utilizan para controlar el acceso concurrente a estado compartido.}
-\label{fig0501}
-\end{figure}
-
-Décadas de trabajo han desarrollado un enfoque mucho más simple para escribir programas multihilo que el uso de cargas y almacenamientos atómicos. Este enfoque se extiende de la modularidad de la programación orientada a objetos para programas multihilo. Como ilustra la \textit{fig.} \ref{fig0501}, un programa multi-hilo se construye a partir de los objetos compartidos y un conjunto de hilos que operan en ellos.
-
-Los objetos compartidos son objetos que se pueden acceder de manera segura por varios subprocesos. Todos estos recursos compartidos en un programa - incluyendo variables asignados en el montón (por ejemplo, objetos asignados con malloc o nuevo) y, variables globales estáticos - debe ser encapsulado en uno o más objetos compartidos.
-
-Programar con objetos compartidos se extiende la programación tradicional orientado a objetos, en la cual los objetos ocultar sus detalles de implementación detrás de una interfaz limpia. De la misma manera, los objetos compartidos ocultar los detalles de la sincronización de las acciones de múltiples hilos detrás de una interfaz limpia. Los hilos que utilizan objetos compartidos sólo necesitan entender la interfaz; ellos no necesitan saber cómo el objeto compartido maneja internamente la sincronización.
-
-Al igual que los objetos normales, los programadores pueden diseñar objetos compartidos para cualesquiera módulos, interfaces y semántica que necesita la aplicación. Cada clase de objeto compartido define un conjunto de métodos públicos en whichthreads operar. Para ensamblar el programa general de estos objetos compartidos, cada hilo se ejecuta un "bucle principal", escrita en términos de acciones sobre los métodos públicos de objetos compartidos.
-
-Dado que los objetos compartidos encapsulan estado compartido del programa, el código de bucle principal que define medidas de alto nivel de un hilo no necesita preocuparse por los detalles de sincronización. Así, el modelo de programación se ve muy similar a la del código de un solo subproceso.
-
-\subsection{La implementación de objetos compartidos}
-Por supuesto, a nivel interno los objetos compartidos deben manejar los detalles de sincronización. Los objetos compartidos se aplican en capas.
-\begin{itemize}
-\item \textbf{Capa de objeto compartido.} Al igual que en la programación orientada a objetos estándar, los objetos compartidos definen la lógica específica de la aplicación y ocultan detalles internos de implementación. Externamente, parecen tener la misma interfaz que debe definir para un programa de un solo subproceso.
-
-\item \textbf{Capa de sincronización de variable.} En lugar de la aplicación de los objetos compartidos directamente con
-intercalado cuidadoso de las cargas y almacenamientos atómicos, los objetos compartidos incluyen variables de sincronización como variables miembro. las variables de sincronización, almacenados en la memoria al igual que cualquier otro objeto, pueden incluirse en cualquier estructura de datos.
-
-Una variable de sincronización es una estructura de datos utilizada para coordinar el acceso simultáneo a estado compartido. Tanto la interfaz y la implementación de las variables de sincronización deben ser cuidadosamente diseñadas. En particular, podemos construir objetos compartidos utilizando dos tipos de variables de sincronización: Bloqueos (\textit{locks}) y Variables de Condición (\textit{condition variables}).
-
-Las variables de sincronización coordinan el acceso a las variables de estado, que son sólo las variables miembros normales de un objeto que está familiarizado con la programación a partir de un único subproceso (por ejemplo, enteros, cadenas, arrays y punteros).
-
-El uso de variables de sincronización simplifica la implementación de objetos compartidos. De hecho, no sólo los objetos compartidos se parecen externamente objetos de un único subproceso tradicionales, pero, mediante la aplicación, las variables de sincronización, sus implementaciones internas son bastante similares a los de los programas de un solo subproceso.
-
-\item \textbf{La capa de instrucción Atómica.} A pesar de que las capas superiores se benefician de un modelo de programación más simple, no es tortugas hasta el final abajo. Internamente, las variables de sincronización deben gestionar los interleavings de acciones diferentes hilos.
-
-En lugar de implementar las variables de sincronización, tales como cerrojos y variables de condición, utilizando cargas atómicas y tiendas como hemos tratado de hacer por el problema demasiada leche, las implementaciones modernas construyen las variables de sincronización utilizando instrucciones de lectura-modificación-escritura atómicas. Estas instrucciones específicos del procesador dejar un hilo tiene acceso de forma temporal y exclusiva atómica a una ubicación de memoria mientras se ejecuta la instrucción. Típicamente, la instrucción atómicamente lee una posición de memoria, hace alguna operación aritmética simple para el valor, y almacena el resultado. El hardware garantiza que las instrucciones de cualquier otro hilo con el acceso a misma posición de memoria se producen ya sea por completo antes de, o en su totalidad después de, la instrucción de lectura-modificación-escritura atómica.
-\end{itemize}
-
-\subsection{Alcance y Hoja de Ruta}
-Los programas concurrentes se construyen en la parte superior de los objetos compartidos. El resto de este capítulo se centra en las capas medias de la figura - Cómo crear objetos compartidos utilizando objetos de sincronización y cómo construir objetos de sincronización de las órdenes de lectura-modificación-escritura atómicas. El capítulo 6 discute los problemas que surgen cuando se componen de varios objetos compartidos en un programa más amplio.
-
-\section{Locks (Bloqueos): Exclusión Mutua}
-Un bloqueo es una variable de sincronización que proporciona la exclusión mutua - cuando un hilo mantiene un bloqueo, ningún otro hilo puede mantenerlo (es decir, otros hilos están excluidos). Un programa tiene asociado cada cerrojo con algún subconjunto de estado compartido y requiere un hilo para mantener el bloqueo al acceder a ese estado. Entonces, sólo un hilo puede acceder al estado compartido a la vez.
-
-La exclusión mutua simplifica en gran medida el razonamiento acerca de los programas ya que un subproceso puede realizar un conjunto arbitrario de operaciones, mientras que mantiene un bloqueo, y esas operaciones parecen ser atómicas a otros hilos. En particular, debido a que un bloqueo hace cumplir la exclusión mutua y los hilos deben sostener el bloqueo para acceder a estos recursos compartidos, ningún otro hilo puede observar un estado intermedio. Otros procesos únicamente pueden observar el estado de la izquierda después de la liberación del bloqueo.
-
-\textbf{Bloqueo para agrupar varias operaciones.} Consideremos, por ejemplo, un objeto de cuenta de banco que incluye una lista de transacciones y un balance total. Para añadir una nueva transacción, adquirimos el bloqueo de la cuenta, añadir la nueva transacción a la lista, leer el antiguo equilibrio, modificarlo, escribir el nuevo equilibrio, y liberar el bloqueo. Para consultar el saldo y relación de las transacciones recientes, adquirimos bloqueo de la cuenta, leemos las transacciones recientes de la lista, lee el equilibrio, y liberar el bloqueo. El uso de cerrojos de esta manera garantiza que una actualización o una consulta completa antes de que comience la siguiente. Cada consulta siempre refleja el conjunto completo de transacciones recientes.
-
-Otro ejemplo de agrupación es cuando la impresión de salida. Sin bloquear, si dos hilos llamados printf al mismo tiempo, los caracteres individuales de los dos mensajes podrían ser intercalados, garbling su significado. En cambio, en los sistemas operativos modernos multi-hilo, printf utiliza un cerrojo para asegurar que el grupo de caracteres en cada mensaje es impreso como una unidad.
-
-Es mucho más fácil de razonar acerca de intercalación de grupos atómicos de operaciones en lugar de intercalar las operaciones individuales para dos razones. En primer lugar, hay un menor número (obviamente) interleavings a considerar. Razonar sobre interleavings sobre una base de grano más grueso reduce el número total de casos a considerar. En segundo lugar, y más importante, que podemos hacer cada grupo atómico de las operaciones corresponden a la estructura lógica del programa, lo que nos permite razonar sobre no invariantes interleavings específicos.
-
-En particular, los objetos compartidos por lo general tienen un cerrojo que guarda todos estado de un objeto. Cada método público adquiere el bloqueo a la entrada y libera el bloqueo en la salida. Por lo tanto, el razonamiento sobre el código de una clase compartida es similar a razonar sobre el código de una clase tradicional: se asume un conjunto de invariantes cuando se llama a un método público y restablecer esas invariantes ante un público devuelve el método. Si definimos así nuestros invariantes, podemos razonar acerca de cada método de forma independiente.
-
-\subsection{Cerrojos: API y Propiedades}
-Un cerrojo permite la exclusión mutua, proporcionando dos métodos: Lock::adquieren() y Lock::Release(). Estos métodos se definen como sigue:
-\begin{itemize}
-\item Un bloqueo puede estar en uno de dos estados: ocupado o libre.
-\item Un bloqueo se encuentra inicialmente en el estado libre.
-\item Lock::adquirir espera hasta que el bloqueo es libre y luego atómicamente hace que el bloqueo OCUPADO. Comprobación del estado para ver si está libre y el establecimiento del estado de OCUPADO están juntos una operación atómica. Incluso si varios subprocesos intentan adquirir el bloqueo, a lo sumo un hilo tendrá éxito. Un hilo observa que el bloqueo es gratis y lo establece en OCUPADO; los otros hilos acaba de ver que el1 cerrojo está ocupado y esperan.
-\item Lock::Bloquear la liberación hace que el bloqueo GRATIS. Si hay operaciones pendientes adquirir, este cambio de estado hace que uno de ellos para proceder.
-\end{itemize}
-
-Se describe cómo implementar los cerrojos con estas características en la sección 5.7. El uso de bloqueos hace que la solución del problema de la leche demasiado trivial. Ambos hilos corren el siguiente código:
-
-
-\subsection{Semáforos}
-Los \textbf{semáforos} fueron introducidos por Dijkstra en 1965 para proveer de sincronización dentro del sistema operativo. Entre los avances introducidos en el diseño de sistemas operativos se puede mencionar las formas estructuradas de utilización de la concurrencia.
-
-Lo semáforos se definen como sigue:
-\begin{itemize}
-\item Un semáforo tiene un valor entero no negativo ($\geq 0$).
-\item Cuando un semáforo es creado, su valor puede ser inicializado en cualquier valor entero no negativo.
-\item {\mf Semaphore::P()} espera hasta que el valor sea positivo. Luego, decrementa su valor de manera atómica en 1 y retorna.
-\item {\mf Semaphore::V()} incrementa de manera atómica el valor en 1. Si algún hilo se encuentra esperando en {\mf P}, entonces uno es habilitado, de forma que la llamada a {\mf P} puede decrementar exitosamente el valor y retornar.
-\item No se permiten otras operaciones en un semáforo. En particular, ningún hilo puede leer directamente el valor del semáforo.
-\end{itemize}
-
-Las acciones de comprobar el valor y modificarlo se realizan en conjunto como una sola acción atómica indivisible. Se garantiza que, una vez que empieza una operación de semáforo, ningún otro proceso podrá acceder al semáforo sino hasta que la operación se haya completado o bloqueado. Esta atomicidad es absolutamente esencial para resolver problemas de sincronización y evitar condiciones de carrera.
-
-La operación {\mf V} incrementa el valor del semáforo direccionado. Si uno o más procesos estaban inactivos en ese semáforo, sin poder completar una operación {\mf P} anterior, el sistema selecciona uno de ellos (al azar) y permite que complete su operación {\mf P} . Así, después de una
-operación {\mf V} en un semáforo que contenga procesos inactivos, el semáforo seguirá en 0 pero habrá un proceso menos inactivo en él. La operación de incrementar el semáforo y despertar a un proceso también es indivisible. Ningún proceso se bloquea al realizar una operación {\mf V}.
-
-Lo normal es implementar {\mf V} y {\mf P} como llamadas al sistema, en donde el sistema operativo deshabilita brevemente todas las interrupciones, mientras evalúa el semáforo, lo actualiza y pone el proceso a dormir, si es necesario. Como todas estas acciones requieren sólo unas cuantas instrucciones, no hay peligro al deshabilitar las interrupciones. Si se utilizan varias CPUs, cada semáforo debe estar protegido por una variable lock para asegurar que sólo una CPU a la vez pueda examinar el semáforo.
-
-Los sistemas operativos diferencian a menudo entre semáforos contadores y semáforos binarios. El valor de un \textbf{semáforo contador} puede variar en un dominio no restringido, mientras que el valor del \textbf{semáforo binario} sólo puede ser 0 ó 1. En algunos sistemas, los semáforos binarios se conocen como \textbf{cerrojos mútex}, ya que son cerrojos que proporcionan exclusión mutua. Cuando el recurso está disponible, un proceso accede y decrementa el valor del semáforo con la operación P. El valor queda entonces en 0, lo que hace que si otro proceso intenta decrementarlo tenga que esperar. Cuando el proceso que decrementó el semáforo realiza una operación V, algún proceso que estaba esperando comienza a utilizar el recurso.
-
-Los semáforos contadores se pueden utilizar para controlar el acceso a un determinado recurso formado por un número finito de instancias. El semáforo se inicializa con el número de recursos disponibles. Cada proceso que desee usar un recurso ejecuta una operación {\mf P()} en el semáforo (decrementando la cuenta). Cuando un proceso libera un recurso, ejecuta una operación {\mf V()} (incrementando la cuenta). Cuando la cuenta del semáforo llega a 0, todos los recursos estarán en uso. Después, los procesos que deseen usar un recurso se bloquearán hasta que la cuenta sea mayor a que 0.
-
-También podemos usar los semáforos para resolver diversos problemas de sincronización. Por ejemplo, considere dos procesos que se estén ejecutando de forma concurrente: {\mf P1} con una instrucción {\mf S1} y {\mf P2} con una instrucción {\mf S2}. Suponga que necesitamos que {\mf S2} se ejecute sólo después que {\mf S1} se haya completado. Podemos implementar este esquema dejando que {\mf P1} y {\mf P2} compartan un semáforo común {\mf synch}, inicializado con el valor 0, e insertando las instrucciones:
+\textbf{Solución 1}. La idea básica es que un compañero de habitación deje una nota en la heladera antes de ir a la tienda. La forma más sencilla de dejar esta nota -- dado nuestro modelo de programación que hemos compartido memoria en el que podemos realizar cargas y almacenamientos atómicos -- es fijar una bandera (\textit{flag}) cuando va a comprar leche y comprobar este indicador antes de ir a comprar leche. Cada uno podría correr el siguiente código:
 
 \lstset{
 	language=C++,
     basicstyle=\ttfamily,
 	keywordstyle=\color{blue}\ttfamily,
     stringstyle=\color{red}\ttfamily,
-	commentstyle=\color{green}\ttfamily,
-    morecomment=[l][\color{magenta}]{\#}
+	commentstyle=\color{orange}\ttfamily,
+    morecomment=[l][\color{magenta}]{\#},
+    tabsize=4,
 }
+
+\begin{lstlisting}
+if (milk == 0){			// si no hay leche
+	if (note == 0){		// si no hay nota
+		note = 1;		// dejar una nota
+		milk++;			// comprar leche
+		note = 0;		// quitar la nota
+	}
+}
+\end{lstlisting}
+
+Desafortunadamente, esta implementación puede violar la seguridad. Por ejemplo, el primer hilo podría ejecutar todo el código incluyendo la verificación del valor de cantidad de leche y luego el contexto cambiar. A continuación, el segundo hilo correr todo este código y comprar leche. Por último, el primer hilo podría ser re-planificado, ver la nota en cero, poner la nota en uno, comprar más leche, y eliminar la nota, dejando el sistema con $leche == 2$.
+
+\begin{lstlisting}
+// hilo A				// hilo B
+if (milk == 0){
+						if (milk == 0){
+							if (note == 0){
+								note = 1;
+								milk++;
+								note = 0;
+							}
+						}
+	if (note == 0){
+		note = 1;
+		milk++;
+		note = 0;
+	}
+}
+\end{lstlisting}
+
+Esta ``solución'' empeora el problema. Si bien por lo general funciona, puede fallar de vez en cuando el planificador hace justo lo correcto (o incorrecto). Hemos creado un \textit{Heisenbug} que hace que el programa falle ocasionalmente en formas que pueden ser muy difíciles de reproducir.
+
+\textbf{Solución 2}. En la solución 1, el compañero de habitación comprueba la nota antes de ajustarla. Esto abre la posibilidad de que un compañero ya haya tomado la decisión de comprar la leche antes de notificar al otro compañero de esa decisión. Si utilizamos dos variables para las notas, un compañero puede crear una nota antes de comprobar la otra nota y tomar la decisión de comprar.
+
+\begin{lstlisting}
+/* Camino A */
+noteA = 1; 				// dejar una nota
+if (noteB == 0) {		// si no hay una nota 	A1
+	if (milk == 0) { 	// si no hay leche		A2
+		milk++; 		// comprar leche 		A3
+	}					//						A4
+}						//						A5
+noteA = 0;				// quitar la nota A
+/* Camino B */
+noteB = 1; 				// dejar una nota
+if (noteA == 0) {		// si no hay una nota 	B1
+	if (milk == 0) { 	// si no hay leche		B2
+		milk++; 		// comprar leche 		B3
+	}					//						B4
+}						//						B5
+noteB = 0;				// quitar la nota B
+\end{lstlisting}
+
+Si el primer hilo ejecuta el {\mf Camino A} y el segundo hilo ejecuta el código del {\mf Camino B}, este protocolo es seguro; haciendo que cada hilo escriba una nota (``yo podría comprar leche'') antes de decidirse a comprar leche. Aseguramos la propiedad de \textit{seguridad}: a lo sumo un hilo compra leche.
+
+Aunque esta intuición es sólida, demostrar que se cumple la propiedad de seguridad sin enumerar todas las posibles intercalaciones  requiere de cierto cuidado.
+
+\textbf{Prueba de seguridad}. Sólo por contradecir vamos a suponer que el algoritmo no es seguro -- tanto A como B compran leche. Debe tenerse en cuenta el estado de las dos variables ({\mf noteB}, {\mf milk}) cuando el hilo A está en la línea marcada con \textbf{A1}, en el preciso momento cuando se produce la carga atómica de {\mf noteB} de la memoria compartida hacia el registro de A. Hay tres casos a considerar:
+\begin{itemize}
+\item Caso 1: ({\mf noteB = 1, milk = cualquier valor}). Este estado contradice la suposición de que el hilo A compra leche y llega a \textbf{A3}.
+\item Caso 2: ({\mf noteB = 0, milk > 0}). En este sencillo programa, la propiedad {\mf milk > 0} es una característica estable -- una vez que se convierte en realidad, sigue siendo cierto para siempre. Por lo tanto, si {\mf milk > 0} es cierto cuando A está en \textbf{A1}, la prueba de A en la línea \textbf{A2} fallará, y A no va a comprar la leche, lo que contradice nuestra suposición.
+\item Caso 3: ({\mf noteB = 0, milk = 0}). Sabemos que el hilo B actualmente no debe encontrarse ejecutando cualquiera de las líneas marcadas {\mf B1-B5}. También sabemos que, o bien {\mf noteA == 1} o {\mf milk > 0} serán verdaderas de ahora en adelante (notaA || milk --OR-- es también una característica estable). Esto significa que B no puede comprar la leche en el futuro (la prueba debe fallar en \textbf{B1} o en \textbf{B2}), lo que contradice nuestra suposición de que tanto A como B compran leche.
+\end{itemize}
+
+Puesto que cada caso contradice la suposición, el algoritmo es seguro.
+
+\textbf{Liveness - Vitalidad}. Por desgracia, la solución 2 no asegura la vitalidad. En particular, es posible que ambos hilos  establezcan sus respectivas notas, que cada hilo compruebe la nota del otro hilo, y por tanto ambos hilos decidan no comprar leche. Esto nos lleva a la solución 3.
+
+\textbf{Solución 3.} La solución 2 era segura porque un hilo podría evitar la compra de leche si había alguna posibilidad de que el otro hilo pueda comprar leche. Para la solución 3, nos aseguramos de que al menos uno de los hilos determine si el otro hilo ha comprado la leche o no antes de decidir si comprar o no. En particular, hacemos lo siguiente:
+
+\begin{lstlisting}
+/* Camino A */
+noteA = 1; 				// dejar una nota A
+while (noteB == 1) { 	// esperar a que no haya una nota B
+	;					// spin (espera)
+}
+if (milk == 0) {		// si no hay leche		-M-
+	milk++;				// comprar leche
+}
+noteA = 0;				// quitar la nota A
+
+/* Camino B */
+noteB = 1;				// dejar una nota B
+if (noteA==0) {			// si no hay nota A
+	if (milk==0) { 		// si no hay leche
+		milk++;			// comprar leche
+	}
+}
+noteB = 0;				// quitar la nota B
+\end{lstlisting}
+
+Podemos demostrar que la solución 3 es seguro usando un argumento similar al que se utilizó para la solución 2. Para demostrar que la solución 2 mantiene la propiedad de vitalidad, se debe observar que el código del {\mf Camino B} no tiene bucles, por lo que finalmente el hilo B debe terminar de ejecutar el código listado. Eventualmente, {\mf noteB == 0} se convierte en verdadero y sigue siendo cierto. Por lo tanto, el hilo A debe finalmente llegar a la línea \textbf{M} y decidir si comprar o no la leche. Si encuentra {\mf milk == 1}, entonces, la leche ha sido comprada. Si encuentra {\mf milk == 0}, entonces va a comprar leche. De cualquier manera, la propiedad de vitalidad -- si es necesario, un poco de leche se compra -- se cumple.
+
+\subsection{Discusión}
+Suponiendo que el compilador y el procesador ejecutan instrucciones en el orden del programa, la prueba anterior muestra que es posible idear una solución a \textit{too much milk} que cumple a la vez las propiedades de seguridad y vitalidad, usando nada más que las operaciones atómicas de carga y almacenamiento en la memoria compartida. Aunque la solución que presentamos sólo funciona para los dos compañeros, no es una generalización, y se llama \textit{algoritmo de Peterson}. Funciona con cualquier número $n$ fijo de hilos. Sin embargo, nuestra solución para \textit{too much milk} (y así mismo algoritmo de Peterson) no es terriblemente satisfactoria:
+\begin{itemize}
+\item La solución es \textit{compleja} y requiere de un cuidadoso razonamiento para estar convencidos de que funciona.
+\item La solución es ineficiente. En demasiada leche, mientras que el hilo A está a la espera, es una \textit{espera-ocupada} que consume recursos de la CPU. En la solución generalizada de Peterson, \textit{todos} los n-hilos \textit{espera-ocupada}. La espera es especialmente problemática en los sistemas modernos con multihilos con derechos preferente, como el hilo \textit{spin} puede estar reteniendo el procesador a la espera de un evento que no puede ocurrir hasta que algún proceso con derechos preferentes sea re-planificado para funcionar.
+\item La solución puede fallar si el compilador o hardware reorganizan las instrucciones. Esta limitación puede abordarse mediante el uso de barreras de memoria. La adición de barreras de memoria aumentaría aún más la complejidad de la implementación del algoritmo; las barreras no abordan las otras limitaciones que acabamos de mencionar.
+\end{itemize}
+
+\section{La estructura de los objetos compartidos}
+\begin{figure}[tbhp]
+\centerline{\includegraphics[scale=0.45]{img/fig0501}}
+\caption{En un programa multi-hilo, los hilos están separados y operan simultáneamente en objetos compartidos. Los objetos compartidos contienen ambas variables de estado y sincronización compartidas, que se utilizan para controlar el acceso concurrente a estado compartido.}
+\label{fig0501}
+\end{figure}
+
+Décadas de trabajo han permitido desarrollar un enfoque mucho más simple para escribir programas multihilo que el uso de cargas y almacenamientos atómicos. Este enfoque extiende la modularidad de la programación orientada a objetos a programas multi-hilo. Como ilustra la \textit{Fig.} \ref{fig0501}, un programa multi-hilo se construye a partir de objetos compartidos y un conjunto de hilos que operan en ellos.
+
+Los objetos compartidos son objetos que se pueden acceder de manera segura por varios hilos. Todos estos recursos compartidos en un programa -- incluyendo variables asignadas en el \textit{heap} (por ejemplo, objetos asignados con {\mf malloc} o {\mf new}) y, variables globales estáticas -- debe ser encapsulado en uno o más objetos compartidos.
+
+Programar con objetos compartidos extiende la programación tradicional orientado a objetos, en la cual los objetos ocultan sus detalles de implementación detrás de una interfaz limpia. De la misma manera, los objetos compartidos ocultan los detalles de la sincronización de las acciones de múltiples hilos detrás de una interfaz limpia. Los hilos que utilizan objetos compartidos sólo necesitan entender la interfaz; ellos no necesitan saber cómo el objeto compartido maneja internamente la sincronización.
+
+Al igual que los objetos normales, los programadores pueden diseñar objetos compartidos para cualesquiera módulos, interfaces y semántica que necesite la aplicación. Cada clase de objeto compartido define un conjunto de métodos públicos en los que el hilo opera. Para ensamblar el programa entero a partir de estos objetos compartidos, cada hilo se ejecuta un ``bucle principal'', escrito en términos de acciones sobre los métodos públicos de objetos compartidos.
+
+Dado que los objetos compartidos encapsulan el estado compartido del programa, el código del bucle principal que define medidas de alto nivel de un hilo no necesita preocuparse por los detalles de sincronización. Así, el modelo de programación se ve muy similar a la del código de un solo hilo.
+
+\subsection{La implementación de objetos compartidos}
+Por supuesto, a nivel interno los objetos compartidos deben manejar los detalles de sincronización. Los objetos compartidos se aplican en capas.
+\begin{itemize}
+\item \textbf{Capa de objeto compartido}. Al igual que en la programación orientada a objetos estándar, los objetos compartidos definen la lógica específica de la aplicación y ocultan detalles internos de implementación. Externamente, parecen tener la misma interfaz que se debiese definir para un programa de un solo hilo.
+
+\item \textbf{Capa de variable de sincronización}. En lugar de implementar objetos compartidos directamente intercalando cuidadosamente las cargas y almacenamientos atómicos, los objetos compartidos incluyen \textit{variables de sincronización} como variables miembro. Las variables de sincronización, almacenadas en la memoria al igual que cualquier otro objeto, pueden incluirse en cualquier estructura de datos.
+
+Una \textbf{variable de sincronización} es una estructura de datos utilizada para coordinar el acceso simultáneo a estado compartido. Tanto la interfaz y la implementación de las variables de sincronización deben ser cuidadosamente diseñadas. En particular, podemos construir objetos compartidos utilizando dos tipos de variables de sincronización: \textbf{Cerrojos} (\textit{locks}) y \textbf{Variables de Condición} (\textit{condition variables}).
+
+Las variables de sincronización coordinan el acceso a las variables de estado, que son sólo las variables miembros normales de un objeto de la programación a partir de un único hilo (por ejemplo, enteros, cadenas, arreglos y punteros).
+
+El uso de variables de sincronización simplifica la implementación de objetos compartidos. De hecho, no sólo los objetos compartidos se parecen externamente a objetos de un único hilo tradicionales, pero, mediante la implementación con variables de sincronización, sus implementaciones internas son bastante similares a las de los programas de un solo hilo.
+
+\item \textbf{La capa de instrucción atómica}. A pesar de que las capas superiores se benefician de un modelo de programación más simple, no todo es tan sencillo. Internamente, las variables de sincronización deben gestionar las intercalaciones de acciones de diferentes hilos.
+
+En lugar de implementar las variables de sincronización, tales como cerrojos y variables de condición, utilizando cargas y almacenamientos atómicos, como hemos tratado de hacer en el problema de demasiada leche, las implementaciones modernas construyen las variables de sincronización utilizando instrucciones de \textit{lectura-modificación-escritura atómicas}. Estas instrucciones específicas del procesador permiten a un hilo tener temporalmente acceso de forma exclusiva y atómica a una ubicación de memoria mientras se ejecuta la instrucción. Típicamente, la instrucción atómicamente lee una posición de memoria, hace alguna operación aritmética simple con el valor, y almacena el resultado. El hardware garantiza que las instrucciones de cualquier otro hilo con el acceso a misma posición de memoria se producen ya sea por completo antes de, o en su totalidad después de, la instrucción de lectura-modificación-escritura atómica.
+\end{itemize}
+
+
+\section{Locks (Cerrojos): Exclusión Mutua}
+Un \textbf{cerrojo} es una variable de sincronización que proporciona la exclusión mutua -- cuando un hilo mantiene un cerrojo, ningún otro hilo puede mantenerlo (es decir, otros hilos están excluidos). Un programa tiene asociado cada cerrojo con algún subconjunto de estado compartido y requiere un hilo para mantener el cerrojo al acceder a ese estado. Entonces, sólo un hilo puede acceder al estado compartido a la vez.
+
+La exclusión mutua simplifica en gran medida el razonamiento acerca de los programas ya que un hilo puede realizar un conjunto arbitrario de operaciones, mientras que mantiene un cerrojo, y esas operaciones parecen ser atómicas a otros hilos. En particular, debido a que un cerrojo hace cumplir la exclusión mutua y los hilos deben sostener el cerrojo para acceder a estos recursos compartidos, ningún otro hilo puede observar un estado intermedio. Otros procesos únicamente pueden observar el estado dejado luego de la liberación del cerrojo.
+
+\textbf{Cerrojos para agrupar varias operaciones}. Consideremos, por ejemplo, un objeto de cuenta bancaria que incluye una lista de transacciones y un balance total. Para añadir una nueva transacción, se adquiere el cerrojo de la cuenta, se añade la nueva transacción a la lista, se lee el antiguo balance, se lo modifica, se escribe el nuevo balance, y se libera el cerrojo. Para consultar el saldo y la lista de transacciones recientes, se adquiere el cerrojo de la cuenta, se lee la lista de transacciones recientes, se consulta el balance y se libera el cerrojo. El uso de cerrojos de esta manera garantiza que una actualización o una consulta se complete antes de que comience la siguiente. Cada consulta siempre refleja el conjunto completo de transacciones recientes.
+
+Otro ejemplo de agrupación es una salida de impresión. Sin cerrojos, si dos hilos llaman a {\mf printf} al mismo tiempo, los caracteres individuales de los dos mensajes podrían ser intercalados, tergiversando su significado. En cambio, en los sistemas operativos modernos multi-hilo, {\mf printf} utiliza un cerrojo para asegurar que el grupo de caracteres en cada mensaje es impreso como una unidad.
+
+Es mucho más fácil de razonar acerca de intercalación de grupos atómicos de operaciones en lugar de intercalar las operaciones individuales por dos razones. En primer lugar, hay un menor número (obviamente) de intercalaciones a considerar. El razonamiento sobre las intercalaciones sobre una base más gruesa reduce el número de casos a considerar. En segundo lugar, y lo que es más importante, podemos hacer que cada grupo atómico de operaciones se corresponda con la estructura lógica del programa, lo que nos permite razonar sobre invariantes, y no sobre intercalaciones específicas.
+
+En particular, los objetos compartidos por lo general tienen un cerrojo que guarda todos los estados de un objeto. Cada método público adquiere el cerrojo a la entrada y lo libera a la salida. Por lo tanto, el razonamiento sobre el código de una clase compartida es similar a razonar sobre el código de una clase tradicional: se asume un conjunto de invariantes cuando se llama a un método público y se restablecen esas invariantes antes de que el método público retorne. Si definimos así nuestros invariantes, podemos razonar acerca de cada método de forma independiente.
+
+\subsection{Cerrojos: API y Propiedades}
+Un cerrojo permite la exclusión mutua, proporcionando dos métodos: {\mf Lock::acquire()} y {\mf Lock::release()}. Estos métodos se definen como sigue:
+\begin{itemize}
+\item Un cerrojo puede estar en uno de dos estados: OCUPADO o LIBRE.
+\item Un cerrojo se encuentra inicialmente en el estado LIBRE.
+\item {\mf Lock::acquire()} espera hasta que el cerrojo esté LIBRE y luego atómicamente pasa al bloqueo a OCUPADO. La comprobación del estado para ver si está LIBRE y el establecimiento del estado de OCUPADO están juntos en una operación atómica. Incluso si varios hilos intentan adquirir el cerrojo, a lo sumo un hilo tendrá éxito. Un hilo observa que el cerrojo está LIBRE y lo establece en OCUPADO; los otros hilos acaban de ver que el cerrojo está OCUPADO y esperan.
+\item {\mf Lock::release()} pasa el cerrojo a LIBRE. Si hay operaciones pendientes de {\mf Lock::acquire()}, este cambio de estado hace que uno de ellos proceda.
+\end{itemize}
+
+El uso de cerrojos hace que la solución del problema \textit{too much milk} sea trivial. Ambos hilos corren el siguiente código:
+
+\begin{lstlisting}
+lock.acquire();
+if (milk == 0) {		// si no hay leche
+	milk++;				// comprar leche
+}
+lock.release();
+\end{lstlisting}
+
+\subsection{Semáforos}
+Los \textbf{semáforos} fueron introducidos por Dijkstra en 1965 para proporcionar sincronización dentro del sistema operativo. Entre los avances introducidos en el diseño de sistemas operativos se puede mencionar las formas estructuradas de utilización de la concurrencia.
+
+Lo semáforos se definen como sigue:
+\begin{itemize}
+\item Un semáforo tiene un valor entero no negativo ($\geq 0$).
+\item Cuando un semáforo es creado, su valor puede ser inicializado en cualquier valor entero no negativo.
+\item {\mf Semaphore::P()} espera hasta que el valor sea positivo. Luego, decrementa su valor de manera atómica en 1 y retorna.
+\item {\mf Semaphore::V()} incrementa de manera atómica el valor en 1. Si hay hilos esperando en {\mf P}, entonces uno de ellos es habilitado, de forma que la llamada a {\mf P} pueda decrementar exitosamente el valor y retornar.
+\item No se permiten otras operaciones en un semáforo. En particular, ningún hilo puede leer directamente el valor del semáforo.
+\end{itemize}
+
+Las acciones de comprobar el valor y modificarlo se realizan en conjunto como una sola acción atómica indivisible. Se garantiza que, una vez que empieza una operación de semáforo, ningún otro proceso podrá acceder al semáforo sino hasta que la operación se haya completado o bloqueado. Esta atomicidad es absolutamente esencial para resolver problemas de sincronización y evitar condiciones de carrera.
+
+La operación {\mf V()} incrementa el valor del semáforo direccionado. Si uno o más procesos estaban inactivos en ese semáforo, sin poder completar una operación {\mf P()} anterior, el sistema selecciona uno de ellos (al azar) y permite que complete su operación {\mf P()} . Así, después de una operación {\mf V()} en un semáforo que contenga procesos inactivos, el semáforo seguirá en 0 pero habrá un proceso inactivo menos en él. La operación de incrementar el semáforo y despertar a un proceso (sacar de la suspensión) también es indivisible. Ningún proceso se bloquea al realizar una operación {\mf V()}.
+
+Lo normal es implementar {\mf V()} y {\mf P()} como llamadas al sistema, en donde el sistema operativo deshabilita brevemente todas las interrupciones, mientras evalúa el semáforo, lo actualiza y suspende el proceso, si es necesario. Como todas estas acciones requieren sólo unas cuantas instrucciones, no se corre peligro al deshabilitar las interrupciones. Si se utilizan varias CPUs, cada semáforo debe estar protegido por una variable \textit{lock} para asegurar que sólo una CPU a la vez pueda examinar el semáforo.
+
+Los sistemas operativos diferencian a menudo entre semáforos contadores y semáforos binarios. El valor de un \textbf{semáforo contador} puede variar en un dominio no restringido, mientras que el valor del \textbf{semáforo binario} sólo puede ser 0 ó 1. En algunos sistemas, los semáforos binarios se conocen como \textbf{cerrojos mútex}, ya que son cerrojos que proporcionan exclusión mutua. Cuando el recurso está disponible, un proceso accede y decrementa el valor del semáforo con la operación {\mf P()}. El valor queda entonces en 0, lo que hace que si otro proceso intenta decrementarlo tenga que esperar. Cuando el proceso que decrementó el semáforo realiza una operación {\mf V()}, algún proceso que estaba esperando comienza a utilizar el recurso.
+
+Los semáforos contadores se pueden utilizar para controlar el acceso a un determinado recurso formado por un número finito de instancias. El semáforo se inicializa con el número de recursos disponibles. Cada proceso que desee usar un recurso ejecuta una operación {\mf P()} en el semáforo (decrementando la cuenta). Cuando un proceso libera un recurso, ejecuta una operación {\mf V()} (incrementando la cuenta). Cuando la cuenta del semáforo llega a 0, todos los recursos estarán en uso. Después, los procesos que deseen usar un recurso se bloquearán hasta que la cuenta sea mayor a que 0.
+
+También podemos usar los semáforos para resolver diversos problemas de sincronización. Por ejemplo, considere dos procesos que se estén ejecutando de forma concurrente: {\mf P1} con una instrucción {\mf S1} y {\mf P2} con una instrucción {\mf S2}. Suponga que necesitamos que {\mf S2} se ejecute sólo después que {\mf S1} se haya completado. Podemos implementar este esquema dejando que {\mf P1} y {\mf P2} compartan un semáforo común {\mf synch}, inicializado con el valor 0, e insertando las instrucciones:
 
 \begin{lstlisting}
 S1;
@@ -1323,8 +1397,7 @@ S2;
 P(synch);
 \end{lstlisting}
 
-en el proceso {\mf P2}. Dado que {\mf synch} se inicializa con el valor 0, {\mf P2} ejecutará {\mf S2} sólo después de que {\mf P1} haya invocado 
-V(synch), instrucción que sigue a la ejecución de {\mf S1}.
+en el proceso {\mf P2}. Dado que {\mf synch} se inicializa con el valor 0, {\mf P2} ejecutará {\mf S2} sólo después de que {\mf P1} haya invocado {\mf V(synch)}, instrucción que sigue a la ejecución de {\mf S1}.
 
 \setcounter{chapter}{6}
 \chapter{Scheduling - Planificación}
